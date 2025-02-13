@@ -1,5 +1,10 @@
+mod borrowing;
+mod function;
 mod loops;
+mod memory;
 mod number;
+mod reference;
+mod struct;
 fn main() {
     println!("Hello, world!");
     let x: i32 = 5;
