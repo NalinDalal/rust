@@ -1,10 +1,14 @@
 mod borrowing;
+mod enum1;
+mod error;
 mod function;
 mod loops;
 mod memory;
 mod number;
+mod option_enum;
+mod pattern;
 mod reference;
-mod struct;
+mod structs;
 fn main() {
     println!("Hello, world!");
     let x: i32 = 5;

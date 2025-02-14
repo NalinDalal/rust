@@ -171,5 +171,41 @@ irrespective of their Mutability
 
 # Struct
 to collect over similar data together to bind them, like classes in cpp, objects in js
-3:14:18
+allows to make custom data binded together
+```rs
+struct Rect {
+    width: u32,
+    height: u32,
+}
+```
 
+# Enums
+
+enums and pattern matching, enums with values
+Result and Option enum
+
+# Pattern Matching
+Let you pattern match across various variants of an enum and run some logic
+
+# Error Handling
+we know what type of error handling is in cpp, js like try catch block
+Rust provides an Enum for same
+```rs
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+```
+it is an enum (with generic types)
+This enum is what a function can return/returns when it has a possibility of throwing an error
+
+example: error.rs
+it returns a enum with the `Ok` variant having a string value and `Err` variant
+having an Error value
+
+option enum-> to introduce concept of nullability in a safe and expressive way.
+if u ever have a function that should return null, return an Option instead.
+
+# Project Idea
+1. Backend for a full stack app
+2. CLIs
