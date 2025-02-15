@@ -206,6 +206,62 @@ having an Error value
 option enum-> to introduce concept of nullability in a safe and expressive way.
 if u ever have a function that should return null, return an Option instead.
 
+# Package Management
+You can add an external crate to your project by running -> `cargo add
+crate_name`
+1:31:23
+
+crate-> term for packages in rust, just like express, zod etc.
+ex: chrono for date and time
+
+# Memory Management
+amount of space a number take doesn't changes as time goes b, but for a string
+it may change
+
+it's pkay if size of variable is defines, but say we use a function
+so the function get's pushed onto stack, so like 2 variable then a function
+soit will create a stack fame, push funtion on it
+now for funtion, another frame gets pushed on memory
+this fram contains inside of function, first it will get pushed
+then one for function itself
+then for the main function
+
+
+for data structure like number, we do not neet to worry
+they are non dynamic variable
+
+but not true for string
+
+when to store on heap
+
+# Memory Management
+
+| **Heap** | **Stack** |
+|----------|----------|
+| **Dynamic, allocated at runtime** | **Static, allocated at compile time** |
+| **Much larger in size** | **Smaller in size** |
+| **Slower due to dynamic allocation and deallocation** | **Faster** |
+| **Used for Dynamic and large data structures (e.g., Vec, HashMap, Box)** | **Used for Small, fixed-size variables and function call information** |
+
+# Memory Storage
+
+| **Stored on the Stack** | **Stored on the Heap** |
+|------------------------|----------------------|
+| Numbers - `i32`, `u64`, `f32` | Strings |
+| Booleans - `true`, `false` | Vectors |
+| Fixed sized arrays - `[i32; 4]` | HashMap |
+| Structs - `{ x: i32, y: i32 }` | Large Arrays/Structs that can’t fit in the Stack |
+| References (later) | |
+
+
+say for string
+store it on stack with a pointer to Heap storing the data
+1:57:08
+
+
+
+
+
 # Project Idea
 1. Backend for a full stack app
 2. CLIs

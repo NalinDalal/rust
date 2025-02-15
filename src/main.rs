@@ -6,6 +6,7 @@ mod loops;
 mod memory;
 mod number;
 mod option_enum;
+mod packages;
 mod pattern;
 mod reference;
 mod structs;

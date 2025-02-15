@@ -7,3 +7,4 @@ name = "number"
 path = "src/number.rs"
 
 [dependencies]
+chrono = "0.4.39"
