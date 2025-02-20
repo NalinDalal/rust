@@ -2,6 +2,10 @@ mod borrowing;
 mod enum1;
 mod error;
 mod function;
+mod hash_map;
+mod hash_map2;
+mod iterator;
+mod lifetime;
 mod loops;
 mod memory;
 mod number;
@@ -10,6 +14,10 @@ mod packages;
 mod pattern;
 mod reference;
 mod structs;
+mod thread;
+mod trait1;
+mod vector;
+
 fn main() {
     println!("Hello, world!");
     let x: i32 = 5;

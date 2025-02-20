@@ -256,12 +256,425 @@ when to store on heap
 
 say for string
 store it on stack with a pointer to Heap storing the data
-1:57:08
+Why are strings stored on the heap?
+1. They are large
+2. Their size can change at runtime, and the size of a stack frame needs to be fixed
 
 
+# Moving
+say a1 had some data, but we assigned it another variable like:
+```rs
+let a1 = String::from("harkirat") ;|
+let a2=a1;
+Println! ("number uis (}", a1);
+```
+this is wrong , to overcome it use `clone`
+```rs
+let a2=a1.clone();
+```
+rust just doesn't allow it b/c of dangling pointer 
+
+just move the owner
+```rs
+fn create_string() {
+let s1: String = String:: from ("Hello");
+let s2: String = s1;
+// Print the string
+println! ("{}", s1):;}
+fn main(){create_string();}
+```
+borrow of moved value: 's1'
+value borrowed here after move
+solution->
+either pass back the ownership or clone it
+```rs
+s2=s1
+    //do opr with s2
+//then    
+    s1=s2
+```
+or clone it
+```rs
+let s2 = s1.clone();
+```
+
+# Borrow
+instead of moving, just borrow it
+```rs
+fn main(){
+    let s1=String::from("harkirat");
+    do_something(s2:&s1);   //sort of a pointer
+    println!("number is {}",s1);
+}
+fn do_something(s2:&String){
+    println!("{}",s2);
+}
+```
+
+## Rules
+• At any given time, you can have either one mutable reference or any number of immutable references.
+• References must always be valid.
+
+# Collections
+just like stl in cpp.
+Rust's standard library includes a number of very useful data structures called collections.
+Most other data types represent one specific value, but collections can contain multiple values. the data these collections point to is stored on the heap
+
+# Vectors
+Similar to vector in cpp
+same as stack and heap,
+basically the array is on heap, but stack has the pointer to that heap
+heap can be increased decreased
+need to make it mutable
+```rs
+let mut vec=Vec::new();
+vec.push(1);
+vec.push(2);
+```
+more code in vector.rs file
+
+# HashMaps
+they store key value pairs in rust
+use a library-> `use std::collections::HashMaps`
+`HashMap.rs`
+
+# Iterators
+The iterator pattern allows you to perform some task on a sequence of items in turn. An iterator is responsible for the logic of iterating over each item and determining when the sequence has finished. When you use iterators, you don't have to reimplement that logic yourself.
+
+In Rust, iterators are lazy, meaning they have no effect until you call methods that consume the iterator to use it up. For example, the code in Listing 13-10 creates an iterator over the items in the vector `v1` by calling the `iter` method defined on `Vec<T>`. This code by itself doesn't do anything useful.
+
+they literally don't have any effect on code till they are consumed or called.
+
+1. using for loops:
+```rs
+fn main() {
+let nums = vec! [1, 2, 3];
+for value in nums{ println!("{}", value);}}
+```
+2. Iterating after creating an 'iterator'
+```rs
+fn main() {
+let nums= vec! [1, 2, 3];
+let iter = nums.iter();
+for value in iter {
+println! ("{}", value);
+}}
+```
+
+The iter method in Rust provides a way to iterate over the elements of a collection by `borrowing them`.
+You can't mutate the variables since we have an immutable reference to the internal elements
+it borrows the values, doesn't consumes them and becomes their owner.
+
+3. using 'iter_mut'
+```rs
+fn main(){
+    let mut v1=vec![1,2,3];
+    let v1_iter=v1.iter_mut();
+    for val in v1_iter{
+        *val=*val+1
+    }
+    println!("{:?}",v1);
+}
+```
+
+4. using '.next'
+it check and then consumes if any next value exist, else null
+so here the while check it iter.next has some value then enter scope, else stop
+```rs
+fn main(){
+let nums=vec![1,2,3];
+let mut iter=nums.iter();
+while let Some(val)=iter.next(){
+    print!("{}",val);
+}}
+```
+it is similar to:
+```rs 
+for val in v1_iter {
+*val = *val + 1}
+```
+
+it has a next function under the hood in it's own toolchain
+
+5. using `into_iter`
+it is simialr to iter but it's like giving the ownership, so it takes over the ownership of the collection
+Useful when
+    1. You no longer need the original collection
+    2. When you need to squeeze performance benefits by transferring ownership (avoiding references)
+
+Many iterator adapters take closures as arguments, and commonly the closures we’ll specify as arguments to iterator adapters will be closures that capture their environment.
+
+iter v/s into_iter
+iter stores the references, but into_iter does directly on vector
+
+| Iterator Type  | Description |
+|---------------|-------------|
+| `iter()`      | If you want immutable references to the inner variables and don't want to transfer ownership |
+| `iter_mut()`  | If you want mutable references to the inner variables and don't want to transfer ownership |
+| `into_iter()` | If you want to move the variable into the iterator and don't want to use it afterwards |
+
+`for` iterator directly applied on a vector is same as `into_iter`
 
 
+## Consuming Adapters
+on top of an iterator create a variable.
+now various function can be applied on it
+```rs
+let v1 = vec![1, 2, 31;
+let v1_iter = v1.iter();
+let total: i32 = v1_iter.sum();
+```
+it can be used only once, like can't be called again after once used, as it
+ends up consumes up that iterator to that it gets moved to that variable it is
+assigned to, takes over the ownership
 
+## Iterator Adapters
+Iterator adaptors are methods defined on the Iterator trait that don't consume the iterator. 
+Instead, they produce different iterators by changing some aspect of the original iterator.
+
+1. map
+```rs
+fn main() {
+let
+v1: Vec<i32> = vec! [1, 2, 3];
+let iter = v1. iter();
+let iter2 = :
+map (|x| x + 1);
+for x in iter2 {
+println! ("{}", x);}}
+```
+like it convert 1 to 2, 2 to 3, 3 to 4
+so at index 0 it updates 1 to 2
+
+it's just like map function
+like for filer->
+```rs
+fn main() {
+let v1: Vec<i32> = vec![1, 2, 3];
+let iter = v1.iter();
+let iter2 = iter.filter (|x| *x % 2 == 0);
+for x in iter2 {
+println! ("{}",x);}}
+```
+
+Assignment -
+Write the logic to first filter all odd values then double each value and create a new vector
+
+```rs
+fn filter_and_map(v: Vec<i32>) → Vec<:32> {
+let new_iter = v.iter().filter(|x| *x%2 == 1).map(|x| x + 2);
+let new_vec: Vec<i32> = new_iter.collect();
+return new_vec;}
+fn main(){
+    let v1:Vec<i32>=vec![1,2,3];
+    let ans=filter_and_map(v1);
+    println!("{:?}",ans);
+}
+
+```
+
+Assignment:
+vector<string,number> convert to hashmap, create iterator to hashmap to vector
+
+
+# Strings vs Slices
+
+String is UTF-8 encoded
+it is growable, mutable, owned
+might refer to `String type` or `String Slices`
+all this is utf-8 encoded
+
+slices is generic concept, apply to vectors and strings
+it is a kind of reference so can't have ownership
+
+```rs
+fn main() {
+    //1. string created
+let mut name = String::from ("Harkirat");
+    //2. string mutated-> pushed something to the string
+
+name.push_str(" Singh"); println!( "name is {}", name);
+//3. to delete something from string
+    name. replace_range(8..name.len(), "");     //delete everything from 8th character or index to end of string
+println! ("name is {}", name);
+}
+```
+
+it is sort of a view into the string with window given
+
+Write a function that takes a string as an input And returns the first word from it
+```rs
+fn main(){
+    let mut name="Nalin Dalal";
+    //like return Nalin
+    //so do like iterate till space
+    //break, else push to ans_string
+    //return it
+name.replace_range(2..name.len(),"");
+    println!("First char of string is {}",name);
+}
+```
+
+normal approach: iterate over the original string, push it to new ans string
+iterate till space is encountered
+problem:
+1. if `name` gets cleared, the whole `ans` string also gets cleared
+2. ends up using double the memeory
+
+new problem: return a view from the string for first word
+
+cause we can have multiple immutable references, but only one mutable reference can exist i.e. you can't have other immutable/mutable reference
+
+Approach 2(with slices)
+```rs
+fn main(){
+    let name=String::from("hello world");
+    let mut space_index=0;
+    for i in name.chars(){
+        if i==' '{
+            break;
+        }
+        space_index=space_index+1;
+    }
+    let ans=&name[0..space_index];  //ans is immutable reference to name
+    println!("ans is {}",ans);
+}
+```
+
+but say you just declare string w/o declaring data type, like just a String Literal; type is &str
+to print vector with start index and end index
+```rs
+fn main() {
+let v = [1, 2, 3,4];
+println!("{:?}"，&v[0..3]); //prints 0,1,2
+}
+```
+
+
+# Generics
+used to remove code repetetion
+like generics in cpp
+```rs
+fn main() {
+let bigger = largest(1, 2);
+let bigger_char = largest( 'a', 'b');
+println!("{}", bigger);
+println!("{}", bigger_char);}
+
+fn largest<T: std::cmp::PartialOrd>(a: T, b: T) -> T
+{
+if
+a > b {a}else{b}}
+```
+args are T, return type is also T, just trait bound it
+
+# Traits
+like interface in TS,JS
+defines functionality of a type which can be shared to other types
+it's like a blueprint for Structs to follow
+
+## Traits as Parameters/Arguments
+`impl trait` is syntactical sugar
+it get converted to something else
+
+syntax:
+```rs
+pub fn notify<T:Summary>(item:T){
+    println!("Breaking news! {}",item.summarize());
+}
+```
+bound to single trait
+multiple trait bound-> `<T: Summary+fix>`
+
+
+# Lifetimes
+say to print longest string b/w 2
+so u define a function longest() utilise the size function 
+now for main function u call a variable initially
+but after input you store that function into that vairable initialises initially
+quite weird right
+declare first, assign later
+```rs
+fn longest(a:String,b:String)->String{
+    if a.len()>b.len(){
+        return a;
+    }else{return b;}
+}
+
+fn main(){
+    let longest_str;
+    let str1=String::from("small");
+{
+        let str2=String::from("longer");
+        longest_str=longest(str1,str2);
+    }
+    println!("{}",longest_str);
+}
+```
+
+Write a function that takes two string `references` as an input And returns the bigger amongst them
+
+so basically lifetime is span where variable and function are valid
+
+so like s1 has lifespan `a, for s2 it is `a
+so ans lifespan is intersection of both
+so basically space where s1, s2 is valid both, their return type is valid at
+their intersection
+
+say you have s2 inside s1 so return type will always will be in s2, as it is
+intersection s1 ans s2
+
+## Structs with lifeTimes
+same but struct is also treated a function
+```rs
+struct User<'a,'b>{
+    first_name:&'a str,
+    last_name:&'b str,`
+}
+fn main(){
+    let user:User;
+    let first_name=String::from("Nalin");
+//lifetime is just inside that
+{
+        let last_name=String::from("Singh");
+        user=User{first_name:&first_name,last_name:&last_name};
+    }
+    println!("The name of user is {}",user.first_name);
+}
+```
+
+
+# MultiThreading
+run mutliple independents parts in single process
+this parts are called threads
+an executed program’s code is run in a process, and the operating system will manage multiple processes at once. Within a program, you can also have independent parts that run simultaneously. The features that run these independent parts are called threads.
+
+ex: `thread.rs`
+
+We’ll often use the `move` keyword with closures passed to `thread::spawn` because the closure will then take ownership of the values it uses from the environment, thus transferring ownership of those values from one thread to another. In the “Capturing References or Moving Ownership” section of Chapter 13, we discussed move in the context of closures. Now, we’ll concentrate more on the interaction between move and thread::spawn.
+
+# Message Passing/Channel
+passing over a variable, lie delegating a process in parts to 10 diff cpu, or core
+channel, 2 part: transmitter and receiver
+A channel has two halves: a transmitter and a receiver. 
+The transmitter half is the upstream location where you put rubber ducks into the river, and the receiver half is where the rubber duck ends up downstream. 
+One part of your code calls methods on the transmitter with the data you want to send, and another part checks the receiving end for arriving messages. 
+A channel is said to be closed if either the transmitter or receiver half is dropped.
+
+`channel.rs` file
+
+# Macro
+basically to expand single line into multiple lines
+
+
+---------------------------------------------
+remaining:
+Macros
+8. Futures
+9. Async/await and tokio
+
+---------------------------------------
 # Project Idea
 1. Backend for a full stack app
 2. CLIs
+---------------------------------------
