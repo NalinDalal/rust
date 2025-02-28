@@ -665,6 +665,118 @@ A channel is said to be closed if either the transmitter or receiver half is dro
 
 # Macro
 basically to expand single line into multiple lines
+powerful feature that allows for metaprogramming by enabling the generation of code at compile-time
+
+### Key Concepts of Rust Macros:
+
+1. **Code Generation**: Macros allow you to define a pattern for generating code. This means you can write code that produces other code, reducing redundancy and boilerplate.
+2. **Metaprogramming**: Rust macros are a form of metaprogramming because they allow you to write code that writes or manipulates other code. This can be useful for tasks like reducing boilerplate, creating domain-specific languages (DSLs), or automating repetitive patterns.
+
+2 types: Declarative, Procedural
+
+expand the code via -> `cargo expand`
+## Declarative Macro:
+replace the code written with a different code during compile time
+```rs
+macro_rules! say_hello {
+    () => {
+        println!("Hello, world!");
+    };
+}
+
+fn main() {
+    say_hello!();  // Expands to: println!("Hello, world!");
+}
+```
+
+## Procedural Macro:
+more complex macros that allow you to define custom behavior for code generation through Rust code itself
+```rs
+
+#[derive(Serialize, Deserialize)]
+struct User {
+	username: String,
+	password: String,
+	age: u32
+}
+```
+
+### Types of procedural macros
+
+1. **Custom derive macros**
+
+Custom derive macros allow you to define how Rust derives certain traits for types. A common use case is generating code for trait implementations (like `Debug`, `Clone`, etc.).
+
+```rust
+#[derive(Serialize, Deserialize)]
+struct User {
+	username: String,
+	password: String,
+	age: u32
+}
+```
+
+1. **Attribute-like Macros**:
+
+```rust
+#[route("GET")]
+fn home() {
+    println!("Welcome to the home page!");
+}
+
+#[route("POST")]
+fn create_post() {
+    println!("Creating a new post!");
+}
+```
+
+1. **Function like macros**
+
+https://github.com/100xdevs-cohort-3/proc-macro/
+
+### Macros applied to attributes
+
+```rust
+cargo add serde serde_json
+// Update serde to use the derive feature
+serde = {version = "1.0.218", features = ["derive"]}
+```
+
+```rust
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+struct User {
+    #[serde(rename = "user_name")]
+    username: String,
+    
+    #[serde(rename = "pass_word")]
+    password: String,
+    
+    #[serde(rename = "user_age")] 
+    age: u32,
+}
+
+fn main() {
+    let user = User {
+        username: String::from("Alice"),
+        password: String::from("password123"),
+        age: 30,
+    };
+
+    // Serializing to JSON
+    let json = serde_json::to_string(&user).unwrap();
+    println!("{}", json); 
+    // Prints: {"user_name":"Alice","pass_word":"password123","user_age":30}
+}
+
+```
+
+Write a macro that can take more than one function name as input and create
+functions for it.-> macro3.rs
+Copy and Clone are 2 traits
+Copy-> Just copy the value
+Clone-> pass the ownership, expensive
 
 
 ---------------------------------------------
