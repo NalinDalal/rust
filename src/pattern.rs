@@ -1,4 +1,3 @@
-mod number;
 // Define an enum called Shape
 enum Shape {
     Circle(f64),         // Variant with associated data (radius)

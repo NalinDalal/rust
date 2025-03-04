@@ -1,11 +1,14 @@
 mod borrowing;
 mod enum1;
 mod error;
+mod for_temp;
 mod function;
 mod hash_map;
 mod hash_map2;
 mod iterator;
 mod lifetime;
+mod loop2;
+mod loop3;
 mod loops;
 mod macro1;
 mod macro2;
@@ -31,4 +34,7 @@ fn main() {
     let z: f64 = 3.14; //64 bit float no
     println!("z is a float no{}", z);
     //by default turns to i32
+
+    //constants
+    const THREE_HOURS_IN_SECONDS: u32 = 60 * 60 * 3;
 }

@@ -6,6 +6,11 @@ initialise rust project-> `cargo init`
 to run rust file: `rustc main.rs
 ./main  # Runs the compiled binary
 `
+now to create a project using cargo-> 
+`cargo new hello_cargo
+cd hello_cargo
+`
+generates a git repo with files-> Cargo.toml,src/main.rs
 
 initialize a library that you can deploy for other people to use-> `cargo init --lib`
 to run via cargo, need to have a cargo.toml file; if cargo present-> `cargo main.rs`
@@ -13,20 +18,79 @@ to run via cargo, need to have a cargo.toml file; if cargo present-> `cargo main
 hello world-> main.rs
 to compile-> `cargo run`
 
+`cargo.toml`-> think of it as a package.json for rust
+
+From your hello_cargo directory, build your project by entering the following command:
+
+`
+$ cargo build
+   Compiling hello_cargo v0.1.0 (file:///projects/hello_cargo)
+    Finished dev [unoptimized + debuginfo] target(s) in 2.85 secs
+`
+
+command creates an executable file in target/debug/hello_cargo; to run the
+executable ->
+`$ ./target/debug/hello_cargo # or .\target\debug\hello_cargo.exe on Windows
+Hello, world!
+`
+
+`cargo run` is easy to use
+`cargo check` check the file i.e. it will compile whole file but not produce an
+excutable
+
+------
+# Chapter 3
+
 # Variables
 just like cpp we have signed and unsigned integers
 just need to define the type of variable when declaring a number
 `x:i8=34` or `x:i32=1`
 now to print like x:32,y:45 do like->
 `print!("x:{}",x);`
+`{}` indicates that it is a placeholder which points to someother things
+think of `{}` as little crab pincers that hold a value in place
+
+constants are values that are bound to a name and are not allowed to change, but there are a few differences between constants and variables.
+`const THREE_HOURS_IN_SECONDS: u32 = 60 * 60 * 3;`
+Constants are valid for the entire time a program runs, within the scope in which they were declared
+| Length   | Signed  | Unsigned |
+|----------|---------|----------|
+| 8-bit    | i8      | u8       |
+| 16-bit   | i16     | u16      |
+| 32-bit   | i32     | u32      |
+| 64-bit   | i64     | u64      |
+| 128-bit  | i128    | u128     |
+| arch     | isize   | usize    |
+signed-> +ve,-ve
+unsigned-> +ve only
+Signed numbers are stored using two’s complement representation.
+
+--------------------
 
 # loops
 `for _i in 0..100 {print!("{}",i)}` like 0 to 100
 for other things like array, maps, string
 for string-> in loops.rs file
+for loop, while loop
+
+The `loop` keyword tells Rust to execute a block of code over and over again forever or until you explicitly tell it to stop.
+loop2.rs->code
+
+`while`-> loop3.rs
+While the condition is true, the loop runs. When the condition ceases to be true, the program calls break, stopping the loop
+
+## Assignment
+- Convert temperatures between Fahrenheit and Celsius.-> for_temp.rs
+- Generate the nth Fibonacci number.
+- Print the lyrics to the Christmas carol “The Twelve Days of Christmas,” taking advantage of the repetition in the song.
+
 
 # Functions
 need to give a return type also when declaring it.
+
+Note: `println!("Sum of {} and {} is {}", a, b, sum);`
+in the given statement we had 3 arguments so we called `{}` 3 times and added the
+argument in order we want them
 
 # Memory Managment in Rust
 Whenever you run a program (C++, Rust, JS), it allocates and deallocates memory on the RAM.
@@ -36,8 +100,8 @@ Whenever you run a program (C++, Rust, JS), it allocates and deallocates memory 
 |------------------|--------|--------------|
 | 1. Written by smart people | 1. You allocate and deallocate memory yourself | 1. Rust has its own ownership model for memory management |
 | 2. Usually no dangling pointers/memory issues | 2. Can lead to dangling pointers/memory issues | 2. Makes it extremely safe to memory errors |
-| 3. You can't do manual memory management | 3. Learning curve is high since you have to do manual MM | |
-| 4. Examples - Java, JS | 4. Examples - C | |
+| 3. You can't do manual memory management | 3. Learning curve is high since you have to do manual MM |3. Can do both Manual as well as automatic, but the language itself has a way of writing so that it is memory safe |
+| 4. Examples - Java, JS | 4. Examples - C | 4. Example - Rust |
 
 Hence Rust is designed to ensure safety and efficiency without the need for a garbage collector.
 
@@ -45,41 +109,46 @@ ways-> Mutability, Heap and memory, Ownership model, Borrowing and references, L
 
 ## Mutability
 it is Immutable-> can't be changed
-need to specify if want to be mutable
-`  let mut x: i32 = 1;`
+need to specify if want to be mutable-> `mut` keyword
+```rs
+let mut x: i32 = 1;
+x=x+1;//since we are adding 1 to x so it is mutable, need to defined accordingly
+let y=2;
+y=y+1;  //wrong
+```
 
 reason:
 1. Immutable data is inherently thread-safe because if no thread can alter the data, then no synchronization is needed when data is accessed concurrently.
 2. Knowing that certain data will not change allows the compiler to optimize code better.
 
-mutate only when needed; not suggested to keep data mutable
+mutate only when needed; not suggested to keep data mutable to avoid dangling
+pointer error
 
 ## Stack v/s Heap
 `Stack`: primitive data type stores on ram in a form of stack with it's size reserved, so if it's either 4 or 4 million no worry
 `Heap`: used for data that can grow at run time, like heaps or vectors
 
 - define a variable, when called stored into stack frame
-- say 2 fun, 1st calling other, so 2nd function gets pushed on heap; it's stack
-  frame gets copied to stack, so when that function exciutes, it pops that other
+- say 2 function, 1st calling other, so 2nd function gets pushed on heap; it's stack
+  frame gets copied to stack, so when that function excutes, it pops that other
   frame then run the simple/original function
 `memory.rs`
 
 # Ownership
 Ownership is a set of rules that govern how a Rust program manages memory. Allprograms have to manage the way they use a computer’s memory while running. 
-Some languages have garbage collection that regularly looks for no-longer-used memoryas the program runs; 
+Some languages have garbage collection that regularly looks for no-longer-used memory as the program runs; 
 in other languages, the programmer must explicitly allocate and free the memory. Rust uses a third approach: memory is managed through a
-system of ownership with a set of rules that the compiler checks. If any of therules are violated, the program won’t compile. 
+system of ownership with a set of rules that the compiler checks. If any of the rules are violated, the program won’t compile. 
 None of the features of ownership will slow down your program while it’s running.
 
 Ex: say a girl always want a boyfriend/owner, say if she is single she will die,
-but need to have atleast one owner/boyfriend. so if owner dies, then i must find
-a new owner.
+but need to have atleast one owner/boyfriend. so if owner dies, then i must find a new owner.
 
 ## Stack Variables
 if stack goes out of scope then heap dies, 
 
 ## Heap variables
-Heap variables are like Rihana. They always want to have a single owner, and if their owner goes out of scope, they get deallocated.
+Heap variables are like Rihana. They always want to have a single owner(boyfriend), and if their owner goes out of scope(boyfriend dies), they get deallocated(Rihana also dies).
 Any time the owner of a heap variable goes out of scope, the value is de-allocated from the heap.it gets cleared
 
 ## Why
@@ -91,6 +160,7 @@ fn main () {
 let s1: String = String:: from("Hi there");
 let s2: String = s1;
 println!("{}",s2);}
+//so now if i call s1 it will give error
 ```
 This is to avoid memory issues like
 1. Double free error.
@@ -98,7 +168,7 @@ This is to avoid memory issues like
 when owner goes out of scope, data gets cleared
 
 ## Fix
-Clone the string
+Clone the string, basically clones over the content
 ```rs
 fn main() {
     let s1 = String::from("hello");
@@ -142,7 +212,7 @@ fn main() {
 
 # Borrowing
 transferring ownership of variables to fns
-passing a reference to the string to the function `take_ownership`,the ownership of the string remains with the original variable, in the mainfunction.
+passing a reference to the string to the function `take_ownership`,the ownership of the string remains with the original variable, in the mainFunction.
 allows to use `my_string` again after the function call.
 borrowing.rs
 ```rs
@@ -156,11 +226,17 @@ fn takes_ownership(some_string: &String) {
     println!("{}", some_string);  // some_string is borrowed and not moved
 }
 ```
+so what is rihana ?
+rihana is a whore{it's ownership can be borrowed anytime as per user requirement}
+
 # mutable references
 if want to update value of variable
 only one at a time
 if rihana does something with one borrowerer then she can't do with any other
 irrespective of their Mutability
+
+that means rihana can only have only one editor at a time, either the onwer or
+only one borrowerer
 
 ## Rules
 - There can me many immutable references at the same time
@@ -207,9 +283,10 @@ option enum-> to introduce concept of nullability in a safe and expressive way.
 if u ever have a function that should return null, return an Option instead.
 
 # Package Management
-You can add an external crate to your project by running -> `cargo add
-crate_name`
-1:31:23
+You can add an external crate to your project by running -> 
+```bash
+cargo add crate_name
+````
 
 crate-> term for packages in rust, just like express, zod etc.
 ex: chrono for date and time
@@ -218,14 +295,17 @@ ex: chrono for date and time
 amount of space a number take doesn't changes as time goes b, but for a string
 it may change
 
-it's pkay if size of variable is defines, but say we use a function
+it's okay if size of variable is defines, but say we use a function
 so the function get's pushed onto stack, so like 2 variable then a function
-soit will create a stack fame, push funtion on it
+so it will create a stack frame, push funtion on it
 now for funtion, another frame gets pushed on memory
-this fram contains inside of function, first it will get pushed
+this frame contains inside of function, first it will get pushed
 then one for function itself
 then for the main function
 
+so basically, main gets pushed to stack, then the function, then function data;
+now while compiling first stack data gets popped, then stack itself, then main
+function
 
 for data structure like number, we do not neet to worry
 they are non dynamic variable
@@ -241,7 +321,7 @@ when to store on heap
 | **Dynamic, allocated at runtime** | **Static, allocated at compile time** |
 | **Much larger in size** | **Smaller in size** |
 | **Slower due to dynamic allocation and deallocation** | **Faster** |
-| **Used for Dynamic and large data structures (e.g., Vec, HashMap, Box)** | **Used for Small, fixed-size variables and function call information** |
+| **Use: Dynamic and large data structures (e.g., Vec, HashMap, Box)** | **Use: Small, fixed-size variables and function call information** |
 
 # Memory Storage
 
@@ -266,7 +346,7 @@ say a1 had some data, but we assigned it another variable like:
 ```rs
 let a1 = String::from("harkirat") ;|
 let a2=a1;
-Println! ("number uis (}", a1);
+Println! ("number is {}", a1);
 ```
 this is wrong , to overcome it use `clone`
 ```rs

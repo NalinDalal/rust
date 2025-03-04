@@ -1,6 +1,6 @@
 //to import packages-> cargo add <package_name>
 //ex: cargo add chrono
-//appends into Caargo.toml
+//appends into Cargo.toml
 use chrono::Local;
 
 fn main() {

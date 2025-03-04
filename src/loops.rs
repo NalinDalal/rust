@@ -1,5 +1,6 @@
-fn loops() {
+fn forLoops() {
     let mut x: i8 = 10;
+    //for loop
     for _ in 0..100 {
         x = x + 100;
     }
@@ -9,7 +10,7 @@ fn loops() {
 
 fn main() {
     println!("counting from 0 to 100->");
-    loops();
+    forLoops();
     let sentence: String = String::from("harkirat");
     let first_word: String = get_first_word(sentence);
     let n: i32 = 1000;
@@ -28,4 +29,14 @@ fn get_first_word(sentence: String) -> String {
     }
     //return ans;
     ans // No need for explicit `return ans;`
+}
+
+fn while_loop() {
+    let mut x: i8 = 100;
+    println!("while loop run->");
+    while x > 0 {
+        //while loop called with condition
+        x = x - 1;
+        println!("{}", x);
+    }
 }
