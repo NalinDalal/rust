@@ -1,6 +1,7 @@
 mod borrowing;
 mod enum1;
 mod error;
+mod fib;
 mod for_temp;
 mod function;
 mod hash_map;
