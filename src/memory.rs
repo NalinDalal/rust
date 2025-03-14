@@ -3,7 +3,8 @@ fn main() {
     heap_fn(); // Call the function that uses heap memory
     update_string(); // Call the function that changes size of variable at runtime
     let s1 = String::from("hello");
-    let s2 = takes_ownership(s1);
+    let s2 = takes_ownership(s1); //value of s1 moved to
+                                  //function which points to s2; hence value moved from s1 to s2
     println!("{}", s2);
 }
 

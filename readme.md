@@ -1,4 +1,5 @@
 let's start with rust- fast and safe
+to open book-> `rustup doc --book`
 already have installed rust locally, to check if exist->`cargo`
 `cargo` is a package manager for rust
 
@@ -144,16 +145,51 @@ None of the features of ownership will slow down your program while it’s runni
 Ex: say a girl always want a boyfriend/owner, say if she is single she will die,
 but need to have atleast one owner/boyfriend. so if owner dies, then i must find a new owner.
 
+## Rules:
+- Each value in Rust has an owner.
+- There can only be one owner at a time.
+- When the owner goes out of scope, the value will be dropped.
+
+`Scope`: A scope is the range within a program for which an item is valid.
+
 ## Stack Variables
-if stack goes out of scope then heap dies, 
+if stack goes out of scope then heap dies,
+
 
 ## Heap variables
 Heap variables are like Rihana. They always want to have a single owner(boyfriend), and if their owner goes out of scope(boyfriend dies), they get deallocated(Rihana also dies).
 Any time the owner of a heap variable goes out of scope, the value is de-allocated from the heap.it gets cleared
+when you put data on the heap, you request a certain amount of space. The memory allocator finds an empty spot in the heap that is big enough, marks it as being in use, and returns a pointer, which is the address of that location.
+ex: Think of being seated at a restaurant. When you enter, you state the number of people in your group, and the host finds an empty table that fits everyone and leads you there. If someone in your group comes late, they can ask where you’ve been seated to find you.
+
+
+pushing to stack faster than allocating on heap cause stack is directly pushed,
+but for heap it has to find space to hold data
+accessing on stack is also faster cause you have to follow a pointer to get there.
 
 ## Why
 beacuse of dangling pointer error, say one clears it, but another has pointer to it. so not allowed.
 heap-> single owner
+
+now say->
+```rs
+    {
+        let s = String::from("hello"); // s is valid from this point forward
+
+        // do stuff with s
+    }                                  // this scope is now over, and s is no
+                                       // longer valid
+
+```
+whenever `s` goes out of scope, rust calls a special function `drop` which clears the memory
+
+## Variables and Data Interacting with Move
+```rs
+    let x = 5;
+    let y = x;  //it is all good;bind the value 5 to x; then make a copy of the value in x and bind it to y
+```
+
+string version:3 parts{a pointer to the memory that holds the contents of the string, a length, and a capacity};stored on stack
 ```rs
 //error code
 fn main () {
@@ -163,9 +199,11 @@ println!("{}",s2);}
 //so now if i call s1 it will give error
 ```
 This is to avoid memory issues like
-1. Double free error.
+1. Double free error: when owner goes out of scope, data gets cleared cause:when s2 and s1 go out of scope, they will both try to free the same memory 
+ Freeing memory twice can lead to memory corruption, which can potentially lead to security vulnerabilities.
+
+
 2. Dangling pointers.
-when owner goes out of scope, data gets cleared
 
 ## Fix
 Clone the string, basically clones over the content
@@ -198,17 +236,19 @@ better way without passing over the ownership-> `references`
 # References
 rihana now comes back to same old guy, use references
 Rihana now says I’d like to be borrowed from time to time. I will still have a single owner, but I can still be borrowed by other variables temporarily
+A reference is like a pointer in that it’s an address we can follow to access the data stored at that address; that data is owned by some other variable
 
 References mean giving the address of a string rather than the ownership of the string over to a function
 ```rs
 fn main() {
     let s1 = String::from("Hello");
-    let s2 = &s1;
+    let s2 = &s1;   //necessary to put '&'
 
     println!("{}", s2);
     println!("{}", s1);    // This is valid, The first pointer wasn't invalidated
 }
 ```
+`&s1` syntax lets us create a reference that refers to the value of s1 but does not own it.
 
 # Borrowing
 transferring ownership of variables to fns
@@ -234,6 +274,8 @@ if want to update value of variable
 only one at a time
 if rihana does something with one borrowerer then she can't do with any other
 irrespective of their Mutability
+
+big restriction:  if you have a mutable reference to a value, you can have no other references to that value
 
 that means rihana can only have only one editor at a time, either the onwer or
 only one borrowerer
