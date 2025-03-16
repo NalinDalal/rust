@@ -16,6 +16,7 @@ mod macro2;
 mod macro3;
 mod macro4;
 mod memory;
+mod method;
 mod number;
 mod option_enum;
 mod packages;

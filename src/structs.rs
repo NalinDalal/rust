@@ -25,6 +25,16 @@ fn main() {
         email: String::from("someone@example.com"),
         sign_in_count: 1,
     };
+
+    //mutable struct example
+    let mut user2 = User {
+        active: true,
+        username: String::from("someusername12323"),
+        email: String::from("someone@34example.com"),
+        sign_in_count: 1,
+    };
+
+    user2.email = String::from("anotheremail@example.com");
     print!("User 1 username: {:?}", user1.username);
     let rect1 = Rect {
         width: 10,

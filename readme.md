@@ -290,11 +290,113 @@ only one borrowerer
 # Struct
 to collect over similar data together to bind them, like classes in cpp, objects in js
 allows to make custom data binded together
+a custom data type that lets you package together and name multiple related values that make up a meaningful group
 ```rs
 struct Rect {
     width: u32,
     height: u32,
 }
+```
+more flexible than tuple
+`width`,`u32`: these are pieces of data known as `fields`
+consist of `key-value pairs`; key-name, value-data
+
+they can be mutable, but agaion need to declare the when declaring them
+
+syntax .. specifies that the remaining fields not explicitly set should have the same value as the fields in the given instance.
+```rs
+fn main() {
+    // --snip--
+
+    let user2 = User {
+        email: String::from("another@example.com"),
+        ..user1 //get remaining fields from user1 struct via copy trait
+    };
+}
+```
+
+## Tuple Struct
+Tuple structs have the added meaning the struct name provides but don’t have names associated with their fields; rather, they just have the types of the fields
+used for:
+- want to give the whole tuple a name and make the tuple a different type from other tuples
+- when naming each field as in a regular struct would be verbose or redundant.
+```rs
+struct Color(i32, i32, i32);
+struct Point(i32, i32, i32);
+
+fn main() {
+    let black = Color(0, 0, 0);
+    let origin = Point(0, 0, 0);
+}
+```
+used to add more meaning 
+
+can't directly print a struct like->
+```rs
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+fn main() {
+    let rect1 = Rectangle {
+        width: 30,
+        height: 50,
+    };
+
+    println!("rect1 is {}", rect1);
+}
+```
+creates problem:->`error[E0277]: `Rectangle` doesn't implement `std::fmt::Display``
+compiler gt's confused b/w what to print and what not to like '{}' and ','. so
+it just gives up compilation, use -> `:?` -> tells println! we want to use an output format called Debug.
+so compiler doesn't even compiler the code here but gives a hint to use debug
+trait more effectively->
+```sh
+   = help: the trait `Debug` is not implemented for `Rectangle`
+   = note: add `#[derive(Debug)]` to `Rectangle` or manually `impl Debug for Rectangle`
+```
+final file->
+```rs
+#[derive(Debug)]
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+fn main() {
+    let rect1 = Rectangle {
+        width: 30,
+        height: 50,
+    };
+
+    println!("rect1 is {rect1:?}");
+}
+```
+use `{:#?}` instead of `{:?}` to style the output
+
+# Method Syntax
+just like function but defined inside context of a struct/enum/trait
+method.rs file
+In main, where we called the area function and passed rect1 as an argument, we can instead use method syntax to call the area method on our Rectangle instance. The method syntax goes after an instance: we add a dot followed by the method name, parentheses, and any arguments.
+
+`getter`-> when the function name is the thing returning itself; ex:
+```rs
+fn width(width:u32)->u32{
+    return width;
+}
+```
+diff method can be declared inside diff impl under same name->
+```rs
+impl Rectangle{fn area(&self) -> u32 {
+        self.width * self.height
+    }}
+impl Rectangle {
+    fn can_hold(&self, other: &Rectangle) -> bool {
+        self.width > other.width && self.height > other.height
+    }
+}
+
 ```
 
 # Enums
