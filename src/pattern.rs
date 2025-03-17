@@ -13,6 +13,12 @@ fn calculate_area(shape: Shape) -> f64 {
         Shape::Rectangle(width, height) => width * height,
     }
 }
+fn plus_one(x: Option<i32>) -> Option<i32> {
+    match x {
+        None => None,
+        Some(i) => Some(i + 1),
+    }
+}
 
 fn main() {
     // Create instances of different shapes
@@ -24,4 +30,10 @@ fn main() {
     println!("Area of circle: {}", calculate_area(circle));
     println!("Area of square: {}", calculate_area(square));
     println!("Area of rectangle: {}", calculate_area(rectangle));
+
+    let five = Some(5);
+    //check in plus_one function, does it match the first variant{None} - no
+    //moves to next variant, does it matches second variant{Some(i)} - yes, excute it
+    let _six = plus_one(five);
+    let _none = plus_one(None);
 }

@@ -135,6 +135,7 @@ pointer error
   frame then run the simple/original function
 `memory.rs`
 
+# Chapter 4 
 # Ownership
 Ownership is a set of rules that govern how a Rust program manages memory. Allprograms have to manage the way they use a computer’s memory while running. 
 Some languages have garbage collection that regularly looks for no-longer-used memory as the program runs; 
@@ -287,6 +288,7 @@ only one borrowerer
 - If someone makes an immutable reference , they don’t expect the value to change suddenly
 - If more than one mutable references happen, there is a possibility of a data race and synchronization issues
 
+# Chap 5
 # Struct
 to collect over similar data together to bind them, like classes in cpp, objects in js
 allows to make custom data binded together
@@ -399,13 +401,83 @@ impl Rectangle {
 
 ```
 
+# Chap 6
 # Enums
+Enums allow you to define a type by enumerating its possible variants
+enumerate- To count off or name one by one;
+```rs
+enum IpAddrKind {
+    V4,
+    V6,
+}
+```
 
-enums and pattern matching, enums with values
+enums with values
 Result and Option enum
 
 # Pattern Matching
 Let you pattern match across various variants of an enum and run some logic
+The match statement is used to pattern match against player_direction to handle each possible variant.
+Think of a match expression as being like a coin-sorting machine
+```rs
+enum Coin {
+    Penny,
+    Nickel,
+    Dime,
+    Quarter,
+}
+
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {    //list `match` with expression `coin` 
+        Coin::Penny => 1,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter => 25,
+    }
+}
+
+```
+feels like if else, but that is like boolean but here it's literally
+everythng;it can be any type
+`Coin::Penny=>1` think of it as a arm; each arm is separated by comma
+ If a pattern matches the value, the code associated with that pattern is executed
+
+to bind with values we use `useState`->
+```rs
+enum Coin{Quarter(UsState),}
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {Coin::Quarter(state) => {
+            println!("State quarter from {state:?}!");
+            25
+        }
+    }
+}
+```
+
+can do same with generics also
+to get the inner `T` value out of the Some case when using `Option<T>`; we can also handle `Option<T>` using match
+
+we always need to exhaust every last possibility in order for the code to be valid. 
+
+can do like spcl action on spcl value
+```rs
+    let dice_roll = 9;
+    match dice_roll {
+        3 => add_fancy_hat(),
+        7 => remove_fancy_hat(),
+        other => move_player(other),
+        _=>reroll(),
+    }
+
+    fn add_fancy_hat() {}
+    fn remove_fancy_hat() {}
+    fn move_player(num_spaces: u8) {}
+fn reroll() {}
+```
+`_` corresponds to a special pattern that matches any value and does not bind to
+that value.
+
+that's like default case
 
 # Error Handling
 we know what type of error handling is in cpp, js like try catch block
