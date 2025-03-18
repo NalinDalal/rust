@@ -498,7 +498,14 @@ having an Error value
 option enum-> to introduce concept of nullability in a safe and expressive way.
 if u ever have a function that should return null, return an Option instead.
 
+# Chap 7
 # Package Management
+- `Packages`: A Cargo feature that lets you build, test, and share crates
+- `Crates`: A tree of modules that produces a library or executable
+- `Modules and use`: Let you control the organization, scope, and privacy of paths
+- `Paths`: A way of naming an item, such as a struct, function, or module
+
+
 You can add an external crate to your project by running -> 
 ```bash
 cargo add crate_name
@@ -507,9 +514,187 @@ cargo add crate_name
 crate-> term for packages in rust, just like express, zod etc.
 ex: chrono for date and time
 
+## Crate
+Binary crates are programs you can compile to an executable that you can run, such as a command-line program or a server.
+
+## Packages
+A package is a bundle of one or more crates that provides a set of
+functionality. `Cargo` is a package containing binary crate for cli
+Package has atleast one crate in it.
+
+## Cheatsheet
+1. Look for root file(src/main.rs or src/lib.rs etc)
+2. declare new modules,submodules here-> `mod filename`
+3. you can refer to code in that module from anywhere else in that same crate, as long as the privacy rules allow
+4. `Private v/s Public`: Code within a module is private from its parent modules by default. To make a module public, declare it with pub mod instead of mod. To make items within a public module public as well, use pub before their declarations.
+5. `use` keyword : use it directly to call directly via shortcut rather than
+   path way->`use crate::garden::vegetables::Asparagus;`
+
+module can be nested->
+```rs
+mod front_of_house {
+    mod hosting {
+        fn add_to_waitlist() {}
+
+        fn seat_at_table() {}
+    }
+
+    mod serving {
+        fn take_order() {}
+
+        fn serve_order() {}
+
+        fn take_payment() {}
+    }
+}
+```
+
+## Path
+used to find files in crate and module tree, 2 type: 
+- `absolute`:full path from crate root
+- `relative`:starts from the current module and uses self, super, or an identifier in the current module.
+
+ex:
+```rs
+mod front_of_house {
+    mod hosting {
+        fn add_to_waitlist() {}
+    }
+}
+
+pub fn eat_at_restaurant() {
+    // Absolute path
+    crate::front_of_house::hosting::add_to_waitlist();
+
+    // Relative path
+    front_of_house::hosting::add_to_waitlist();
+}
+```
+
+parent can't use their child's private item, but child can use parent's private
+items; because child modules wrap and hide their implementation details, but the child modules can see the context in which they’re defined. 
+
+paths can be exposed by adding `pub` keywords
+
+Adding the pub keyword in front of mod hosting makes the module public. With this change, if we can access front_of_house, we can access hosting. But the contents of hosting are still private; making the module public doesn’t make its contents public. 
+
+The `pub` keyword on a module only lets code in its ancestor modules refer to it, not access its inner code.
+final code:
+```rs
+mod front_of_house {
+    pub mod hosting {
+        pub fn add_to_waitlist() {}
+    }
+}
+
+pub fn eat_at_restaurant() {
+    // Absolute path
+    crate::front_of_house::hosting::add_to_waitlist();
+
+    // Relative path
+    front_of_house::hosting::add_to_waitlist();
+}
+```
+
+## Starting Relative Paths with super
+instead of `../..` just use `super`
+```rs
+fn deliver_order() {}
+
+mod back_of_house {
+    fn fix_incorrect_order() {
+        cook_order();
+        super::deliver_order();
+    }
+
+    fn cook_order() {}
+}
+```
+
+
+## bring paths into scope
+Adding `use` and a path in a scope is similar to creating a symbolic link in the filesystem
+ideal way->
+```rs
+mod front_of_house {
+    pub mod hosting {
+        pub fn add_to_waitlist() {}
+    }
+}
+
+use crate::front_of_house::hosting;
+
+pub fn eat_at_restaurant() {
+    hosting::add_to_waitlist();
+}
+```
+Bringing the function’s parent module into scope with use means we have to specify the parent module when calling the function
+
+## Providing New Names with the as Keyword
+`use std::fmt::Result;
+use std::io::Result as IoResult;`
+now both won't conflict even in same scope
+
+## Re-exporting Names with pub use
+when we bring name into scope it is private hence to use it we must add pub
+```rs
+mod front_of_house {
+    pub mod hosting {
+        pub fn add_to_waitlist() {}
+    }
+}
+
+pub use crate::front_of_house::hosting;
+
+pub fn eat_at_restaurant() {
+    hosting::add_to_waitlist();
+}
+```
+## Using External Packages
+say we want to use a package named `rand`; add that into Cargo.toml file->
+`rand = "0.8.5"`
+to bring `rand` definitions into the scope of our package, we added a `use` line starting with the name of the crate, `rand`
+```rs
+use rand::Rng;
+
+fn main() {
+    let secret_number = rand::thread_rng().gen_range(1..=100);
+}
+```
+
+for standard library-> `use std::collections::HashMap;`
+since it is shipped with language itself hence don't need to update anything and
+hence use it directly into the code
+`std` is name of standard crate library
+
+
+## Using Nested Path to clean up
+call directly nested packages like 
+`use std::{cmp::Ordering, io};` 
+instead of
+`use std::cmp::Ordering;
+use std::io;`
+
+
+like see this
+`use std::io;
+use std::io::Write;`
+
+just nest it as->
+`use std::io::{self, Write};`
+
+we want to bring all public items defined in a path into scope, use `glob`/`*`
+operator-> `use std::collections::*;`
+
+modules can be separated into diff files also
+Once the compiler knows the file is part of the project (and knows where in the module tree the code resides because of where you’ve put the mod statement), other files in your project should refer to the loaded file’s code using a path to where it was declared,
+
+Final Summary:
+`Rust lets you split a package into multiple crates and a crate into modules so you can refer to items defined in one module from another module. You can do this by specifying absolute or relative paths. These paths can be brought into scope with a use statement so you can use a shorter path for multiple uses of the item in that scope. Module code is private by default, but you can make definitions public by adding the pub keyword.`
+
+
 # Memory Management
-amount of space a number take doesn't changes as time goes b, but for a string
-it may change
+amount of space a number take doesn't changes as time goes by, but for a string it may change
 
 it's okay if size of variable is defines, but say we use a function
 so the function get's pushed onto stack, so like 2 variable then a function
