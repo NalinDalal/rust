@@ -796,10 +796,19 @@ fn do_something(s2:&String){
 • At any given time, you can have either one mutable reference or any number of immutable references.
 • References must always be valid.
 
+# Chapter 8
 # Collections
+
 just like stl in cpp.
 Rust's standard library includes a number of very useful data structures called collections.
 Most other data types represent one specific value, but collections can contain multiple values. the data these collections point to is stored on the heap
+mainly 3:
+- A _vector_ allows you to store a variable number of values next to each other.
+- A _string_ is a collection of characters. We’ve mentioned the String type previously, but in this chapter we’ll talk about it in depth.
+- A _hash map_ allows you to associate a value with a specific key. It’s a particular implementation of the more general data structure called a map.
+
+vector and hashmap covers most use cases for generics
+
 
 # Vectors
 Similar to vector in cpp
@@ -808,16 +817,221 @@ basically the array is on heap, but stack has the pointer to that heap
 heap can be increased decreased
 need to make it mutable
 ```rs
-let mut vec=Vec::new();
+let mut vec=Vec::new(); //create a new empty vector
 vec.push(1);
 vec.push(2);
 ```
-more code in vector.rs file
+- Vectors are implemented using generics-> `let v: Vec<i32> = Vec::new();`->this says holds i32 data type
+- `Vec<T>` says that any type can be provided by stl can hold any type
+
+more code in `vector.rs` file
+
+via macros-> `let v = vec![1, 2, 3];`
+Because we’ve given initial i32 values, Rust can infer that the type of v is Vec<i32>, and the type annotation isn’t necessary
+
+## Modify a Vector
+use push method-> `v.push(5);` again need to declare v as mutable
+
+## Reading/Accessing element
+2 ways are there-> the `indexing syntax` and the `get` method.
+```rs
+    let v = vec![1, 2, 3, 4, 5];
+
+    let third: &i32 = &v[2];    //to access nth we write n-1 cause zero-indexed property
+    println!("The third element is {third}");
+
+    let third: Option<&i32> = v.get(2);
+    match third {
+        Some(third) => println!("The third element is {third}"),
+        None => println!("There is no third element."),
+    }
+```
+
+now if you directly access any element outside the range, program panics cause
+it references a nonexistent element.
+
+When the `get` method is passed an index that is outside the vector, it returns `None` without panicking.
+
+you can’t have mutable and immutable references in the same scope.
+so once you have an immutable reference you just can't call another mutable one,
+so problemmatic.
+error is due to the way vectors work: because vectors put the values next to each other in memory, adding a new element onto the end of the vector might require allocating new memory and copying the old elements to the new space, if there isn’t enough room to put all the elements next to each other where the vector is currently stored. In that case, the reference to the first element would be pointing to deallocated memory. The borrowing rules prevent programs from ending up in that situation.
+
+## Iterating over Values in a Vector
+- use a for loop
+```rs
+    let v = vec![100, 32, 57];
+    for i in &v {
+        println!("{i}");
+    }
+```
+
+- Iterating over a vector, whether immutably or mutably, is safe because of the borrow checker’s rules.
+
+## Using an Enum to Store Multiple Types
+- Vectors can only store values that are of the same type
+- Rust needs to know what types will be in the vector at compile time so it knows exactly how much memory on the heap will be needed to store each element.
+
+
+# String
+string we know what is
+```rs    
+let mut s = String::new();     //declration of empty string
+    let s = String::from("initial contents");   //create a String from a string literal
+```
+strings are UTF-8 encoded
+
+## Updating a String
+string can grow in size and its content can change
+
+- using `push_str`
+```rs
+    let mut s = String::from("foo");
+    s.push_str("bar");
+```
+
+- using push method{takes single char as argument}
+```rs
+    let mut s = String::from("lo");
+    s.push('l');
+```
+
+- Concatenation with the + Operator or the format! Macro
+```rs
+    let s1 = String::from("Hello, ");
+    let s2 = String::from("world!");
+    let s3 = s1 + &s2; // note s1 has been moved here and can no longer be used
+
+    let s1 = String::from("tic");
+    let s2 = String::from("tac");
+    let s3 = String::from("toe");
+
+    let s = s1 + "-" + &s2 + "-" + &s3;
+     let s = format!("{s1}-{s2}-{s3}");
+```
+
+
+## Indexing
+if you try to access parts of a String using indexing syntax in Rust, you’ll get an error
+` let h = s1[0];`-> error
+
+## Internal Working
+It is a wrapper over a `Vec<u8>`
+```rs
+let hello = "Здравствуйте";     //size is 24 instead of 12 because each Unicode scalar value in that string takes 2 bytes of storage.
+let answer = &hello[0];
+```
+
+**A final reason Rust doesn’t allow us to index into a String to get a character
+is that indexing operations are expected to always take constant time (O(1)).
+But it isn’t possible to guarantee that performance with a String, because Rust
+would have to walk through the contents from the beginning to the index to
+determine how many valid characters there were.**
+
+## String Slicing
+Rather than indexing using [] with a single number, you can use [] with a range to create a string slice containing particular bytes:
+```rs
+let hello = "Здравствуйте";
+let s = &hello[0..4];   //this code panics
+```
+use caution when creating string slices with ranges, because doing so can crash your program.
+
+## Iterating over string
+for char->
+```rs
+for c in "Зд".chars() {
+    println!("{c}");
+}
+```
+
+o/p:
+`З
+д
+`
+for bytes->
+```rs
+for b in "Зд".bytes() {
+    println!("{b}");
+}
+```
+
+o/p:
+`208
+151
+208
+180
+`
+
 
 # HashMaps
 they store key value pairs in rust
+ype HashMap<K, V> stores a mapping of keys of type K to values of type V using a hashing function, which determines how it places these keys and values into memory
+
 use a library-> `use std::collections::HashMaps`
 `HashMap.rs`
+```rs
+    use std::collections::HashMap;
+
+    let mut scores = HashMap::new();    //hashmap created
+
+    scores.insert(String::from("Blue"), 10);    //blue team with 10 points
+    scores.insert(String::from("Yellow"), 50);  //yellow team with 50 points
+```
+to get value out of hash via a key-> `get` method
+```rs
+ let score = scores.get(&team_name).copied().unwrap_or(0);
+```
+
+## HashMap and Ownership
+type of values implementing `Copy` trait ex:i32 values are copied into hashmap
+for owned values ex:String values are moved and hashmap is new owner
+```rs
+    use std::collections::HashMap;
+
+    let field_name = String::from("Favorite color");
+    let field_value = String::from("Blue");
+
+    let mut map = HashMap::new();
+    map.insert(field_name, field_value);
+    // field_name and field_value are invalid at this point, try using them and
+    // see what compiler error you get!
+```
+
+## Updating a Hash Map
+we can increase the content but each unique key can only have one value
+associated with it at a time
+
+## OverWriting a Value
+If we insert a key and a value into a hash map and then insert that same key with a different value, the value associated with that key will be replaced.
+it just upates/overwrites the value
+
+## Adding a Key and Value Only If a Key Isn’t Present
+check if a value exist or not, if then some action, if not then some action
+`entry` api is used here,takes the key you want to check as parameter;returns
+enum called `Entry` that represent i=value may exist or not
+
+    scores.insert(String::from("Blue"), 10);
+    scores.entry(String::from("Yellow")).or_insert(50);
+
+or_insert method on Entry is defined to return a mutable reference to the value for the corresponding Entry key if that key exists, and if not, it inserts the parameter as the new value for this key and returns a mutable reference to the new value
+
+## Updating based on Old Value
+```rs
+    use std::collections::HashMap;
+
+    let text = "hello world wonderful world";
+
+    let mut map = HashMap::new();
+
+    for word in text.split_whitespace() {
+        let count = map.entry(word).or_insert(0);
+        *count += 1;
+    }
+
+    println!("{map:?}");
+
+```
+
 
 # Iterators
 The iterator pattern allows you to perform some task on a sequence of items in turn. An iterator is responsible for the logic of iterating over each item and determining when the sequence has finished. When you use iterators, you don't have to reimplement that logic yourself.
