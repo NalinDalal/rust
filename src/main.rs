@@ -7,6 +7,7 @@ mod for_temp;
 mod function;
 mod hash_map;
 mod hash_map2;
+mod hash_map3;
 mod iterator;
 mod lifetime;
 mod loop2;

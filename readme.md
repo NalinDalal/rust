@@ -479,24 +479,6 @@ that value.
 
 that's like default case
 
-# Error Handling
-we know what type of error handling is in cpp, js like try catch block
-Rust provides an Enum for same
-```rs
-enum Result<T, E> {
-    Ok(T),
-    Err(E),
-}
-```
-it is an enum (with generic types)
-This enum is what a function can return/returns when it has a possibility of throwing an error
-
-example: error.rs
-it returns a enum with the `Ok` variant having a string value and `Err` variant
-having an Error value
-
-option enum-> to introduce concept of nullability in a safe and expressive way.
-if u ever have a function that should return null, return an Option instead.
 
 # Chap 7
 # Package Management
@@ -1142,7 +1124,7 @@ like it convert 1 to 2, 2 to 3, 3 to 4
 so at index 0 it updates 1 to 2
 
 it's just like map function
-like for filer->
+like for filter->
 ```rs
 fn main() {
 let v1: Vec<i32> = vec![1, 2, 3];
@@ -1245,7 +1227,276 @@ println!("{:?}"，&v[0..3]); //prints 0,1,2
 }
 ```
 
+# Chap 9
+# Error Handling
+we know what type of error handling is in cpp, js like try catch block
+but rust doesn't have any try catch or exceptions.
+so hence Rust provides an Enum for same
+```rs
+enum Result<T, E> { //for recoverable errors
+    Ok(T),
+    Err(E),
+}
+```
 
+`panic` is also an implementation.
+it is an enum (with generic types)
+This enum is what a function can return/returns when it has a possibility of throwing an error
+
+example: error.rs
+it returns a enum with the `Ok` variant having a string value and `Err` variant
+having an Error value
+
+option enum-> to introduce concept of nullability in a safe and expressive way.
+if u ever have a function that should return null, return an Option instead.
+
+## Panic
+They are unrecoverable errors.there’s nothing you can do about it.
+two ways to cause a panic in practice: 
+- by taking an action that causes our code to panic (such as accessing an array past the end).
+- by explicitly calling the panic! macro.
+
+when `Panic` occurs 2 ways->
+- unwinding, which means Rust walks back up the stack and cleans up the data from each function it encounters
+- immediately aborting, which ends the program without cleaning up.
+
+to abort in panic mode add in `Cargo.toml` file->
+```toml
+[profile.release]
+panic = 'abort'
+```
+
+call panic in normal file->
+```rs
+fn main() {
+    panic!("crash and burn");
+}
+```
+
+on running it shows our panic message and the place in our source code where the panic occurred: src/main.rs:2:5 indicates that it’s the second line, fifth character of our src/main.rs file.
+
+say you access 100th element of array of length 99, on running it shows that we can set RUST_BACKTRACE environment variable to get a backtrace of exactly what happened to cause the error.
+`BACKTRACE`: list of all the functions that have been called to get to this point.
+
+## Recoverable Errors with Result
+okay say you wanna access a file and open it via rust, now it either maybe open to
+access or not at all, if open then access the file else panic->
+```rs
+use std::fs::File;
+
+fn main() {
+    let greeting_file_result = File::open("hello.txt");
+
+    let greeting_file = match greeting_file_result {
+        Ok(file) => file,
+        Err(error) => panic!("Problem opening the file: {error:?}"),
+    };
+}
+```
+
+on compiling shows that thread panicked cause no such file found.
+When the result is Ok, this code will return the inner file value out of the Ok variant, and we then assign that file handle value to the variable greeting_file. After the match, we can use the file handle for reading or writing.
+The other arm of the match handles the case where we get an Err value from File::open. In this example, we’ve chosen to call the panic! macro. If there’s no file named hello.txt in our current directory and we run this code, we’ll see the following output from the panic! macro:
+```bash
+$ cargo run
+   Compiling error-handling v0.1.0 (file:///projects/error-handling)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.73s
+     Running `target/debug/error-handling`
+thread 'main' panicked at src/main.rs:8:23:
+Problem opening the file: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```
+
+## Matching on Different Errors
+```rs
+use std::fs::File;
+use std::io::ErrorKind;
+
+fn main() {
+    let greeting_file_result = File::open("hello.txt");
+
+    let greeting_file = match greeting_file_result {
+        Ok(file) => file,
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => match File::create("hello.txt") {    //file simply doesn't exist; ErrorKind is a struct
+                Ok(fc) => fc,
+                Err(e) => panic!("Problem creating the file: {e:?}"),
+            },
+            other_error => {    //file has someother errors
+                panic!("Problem opening the file: {other_error:?}");
+            }
+        },
+    };
+}
+```
+
+so we can actually use `match` with `Ok and Err`
+alt code->
+```rs
+use std::fs::File;
+use std::io::ErrorKind;
+
+fn main() {
+    let greeting_file = File::open("hello.txt").unwrap_or_else(|error| {
+        if error.kind() == ErrorKind::NotFound {
+            File::create("hello.txt").unwrap_or_else(|error| {
+                panic!("Problem creating the file: {error:?}");
+            })
+        } else {
+            panic!("Problem opening the file: {error:?}");
+        }
+    });
+}
+```
+
+## UnWrap and Expect
+If the `Result` value is the `Ok` variant, `unwrap` will return the value inside the `Ok`. If the `Result` is the `Err` variant, `unwrap` will call the `panic!` macro for us. Ex:
+```rs
+use std::fs::File;
+
+fn main() {
+    let greeting_file = File::open("hello.txt").unwrap();
+}
+```
+
+`expect` method lets us also choose the `panic!` error message. 
+Using `expect` instead of unwrap and providing good error messages can convey your intent and make tracking down the source of a panic easier
+let us create own custom panic! error message->
+```rs
+use std::fs::File;
+
+fn main() {
+    let greeting_file = File::open("hello.txt")
+        .expect("hello.txt should be included in this project");
+}
+```
+
+## Propogating Errors
+instead of handling the error within the function itself you can return the error to the calling code so that it can decide what to do.
+```rs
+use std::fs::File;
+use std::io::{self, Read};
+
+fn read_username_from_file() -> Result<String, io::Error> { //function is returning a value of type result<T,E>;T is filled with String and E with Error
+    let username_file_result = File::open("hello.txt"); //open `hello.txt` file
+
+    let mut username_file = match username_file_result {
+        Ok(file) => file,
+        Err(e) => return Err(e),
+    };
+
+    let mut username = String::new();
+
+    match username_file.read_to_string(&mut username) {
+        Ok(_) => Ok(username),
+        Err(e) => Err(e),
+    }
+}
+```
+
+## Shortcut: use `?`
+```rs
+use std::fs::File;
+use std::io::{self, Read};
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut username_file = File::open("hello.txt")?;
+    let mut username = String::new();
+    username_file.read_to_string(&mut username)?;
+    Ok(username)
+}
+```
+When the `?` operator calls the from function, the error type received is converted into the error type defined in the return type of the current function.
+
+where to use-> in functions whose return type is compatible with the value the ? is used on. 
+reason->defined to perform an early return of a value out of the function, in the same manner as the match expression
+
+fixes:
+- change the return type of your function to be compatible with the value you’re
+using the ? operator on as long as you have no restrictions preventing that.
+- use a match or one of the Result<T, E> methods to handle the Result<T, E> in whatever way is appropriate.
+
+`?` can also be used with `Option<T>`-> similar to its behavior when called on a `Result<T, E>`
+
+it can extract slice string
+`?` on result returns `Result`; on `Option` returns `Option`;no typecasting b/w
+`Result` and `Option`
+solution-> use methods like the `ok` method on `Result` or the `ok_or` method on `Option` to do the conversion explicitly.
+
+main can return `Result<(), E>`
+
+## To panic! or Not to panic!
+use panic when the error which is returned is unrecoverable
+`unwrap`/`expect`-> u know there is ok value but compiler doesn't.
+
+## Cases in Which You Have More Information Than the Compiler
+example->
+```rs
+    use std::net::IpAddr;
+
+    let home: IpAddr = "127.0.0.1"
+        .parse()
+        .expect("Hardcoded IP address should be valid");
+```
+
+here we know that it is acceptable but compiler will return `Result` as `Err`
+because the compiler isn’t smart enough to see that this string is always a
+valid IP address.
+
+## Creating Custom Types for Validation
+remember that number guessing game.We never validated that the user’s guess was between those numbers before checking it against our secret number; we only validated that the guess was positive.
+
+One way to do this would be to parse the guess as an i32 instead of only a u32 to allow potentially negative numbers, and then add a check for the number being in range
+
+```rs
+    loop {
+        // --snip--
+
+        let guess: i32 = match guess.trim().parse() {
+            Ok(num) => num, //we are checking for a numerical value
+            Err(_) => continue,
+        };
+
+        if guess < 1 || guess > 100 {
+            println!("The secret number will be between 1 and 100.");
+            continue;
+        }
+
+        match guess.cmp(&secret_number) {   //matching for our value
+            // --snip--
+    }
+
+```
+`if`-> check for number in range, but not ideal solution cause having a check like this in every function would be tedious (and might impact performance).
+
+solution-> make a new type and put the validations in a function to create an instance of the type rather than repeating the validations everywhere
+```rs
+pub struct Guess {  //stores the number
+    value: i32, //declared type of variable
+}
+
+impl Guess {
+    pub fn new(value: i32) -> Guess {   //instance creation and return is Guess
+        if value < 1 || value > 100 {   //checks for range
+            panic!("Guess value must be between 1 and 100, got {value}.");
+        }
+
+        Guess { value }
+    }
+
+    pub fn value(&self) -> i32 {
+        self.value
+    }
+}
+```
+
+## Summary
+`panic!` macro-> your program is in a state it can’t handle and lets you tell the process to stop instead of trying to proceed with invalid or incorrect values. 
+`Result` enum-> uses Rust’s type system to indicate that operations might fail in a way that your code could recover from; handle success and failure.
+
+
+
+# Chap 10
 # Generics
 used to remove code repetetion
 like generics in cpp
