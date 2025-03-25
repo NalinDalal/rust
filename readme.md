@@ -1498,26 +1498,163 @@ impl Guess {
 
 # Chap 10
 # Generics
-used to remove code repetetion
+used to remove code repetetion;
+used to define your own types, functions, and methods with generics!
+Generics allow us to replace specific types with a placeholder that represents multiple types to remove code duplication.
+
 like generics in cpp
 ```rs
 fn main() {
-let bigger = largest(1, 2);
-let bigger_char = largest( 'a', 'b');
-println!("{}", bigger);
-println!("{}", bigger_char);}
-
-fn largest<T: std::cmp::PartialOrd>(a: T, b: T) -> T
-{
-if
-a > b {a}else{b}}
+    let bigger = largest(1, 2);
+    let bigger_char = largest( 'a', 'b');
+    println!("{}", bigger);
+    println!("{}", bigger_char);
+}
+fn largest<T: std::cmp::PartialOrd>(a: T, b: T) -> T{
+    if a > b {a}
+    else{b}
+}
 ```
 args are T, return type is also T, just trait bound it
 
+see like want to find larget in a list so 2 ways->
+- do in function itself
+- another function to be made and then called
+
+changes b/w two->
+1. Identify duplicate code.
+2. Extract the duplicate code into the body of the function, and specify the inputs and return values of that code in the function signature.
+3. Update the two instances of duplicated code to call the function instead.
+
+so like say we have 2 type of vectors, like one for i32, othr for char, both
+needs to return largest, so both will have diff functions with diff data-type
+and diff return-type, but notice they will have same logic->
+```rs
+for item in list {
+        if item > largest {
+            largest = item;
+        }
+    }
+largest
+```
+both will just have diff wrapping but core logic will be this only.
+
+now generalised logic->
+use a `Type` Parameter named `T`{by convention in rust}; declare in signature,also so the compiler knows what that name means.
+
+Similarly, when we use a type parameter name in a function signature, we have to declare the type parameter name before we use it.
+place type name declarations inside angle brackets, <>, between the name of the function and the parameter list:
+`fn largest<T>(list: &[T]) -> &T {` -> `largest` is a generic function over type `T`; returns a `reference` to a value of type `T`.
+
+## In Structs
+We can also define structs to use a generic type parameter in one or more fields using the <> syntax.
+```rs
+struct Point<T> {   //says Point<T> struct is generic over some type T
+    x: T,   //both x,y are of same type T; instead of declare like i32 or f64 just used `T`
+    y: T,
+}
+//note: both will need to have same data type in single ref, like {u32,u32} or {i32,i32} only, not like {u32,i32} etc.
+fn main() {
+    let integer = Point { x: 5, y: 10 };
+    let float = Point { x: 1.0, y: 4.0 };
+}
+```
+
+use multiple generic type parameters->
+```rs
+struct Point<T, U> {
+    x: T,
+    y: U,
+}
+```
+
+## In Enums
+```rs
+enum Option<T> {    //enum is generic over type T
+    Some(T),    //variant 1: hold value of type T
+    None,   //doesn't holds any value
+}
+```
+
+## In Methods
+```rs
+struct Point<T> {
+    x: T,
+    y: T,
+}
+
+impl<T> Point<T> {  //a/f declaring T, compiler identifies that arg is generic rather than concrete
+    fn x(&self) -> &T { //defined a method named X on T implmented on type Point<T>
+        &self.x
+    }
+}
+
+fn main() {
+    let p = Point { x: 5, y: 10 };
+    println!("p.x = {}", p.x());
+}
+```
+
+now->
+```rs
+impl Point<f32> {       //only avaliable for f32 data type, so other instances can't use the method
+    fn distance_from_origin(&self) -> f32 {
+        (self.x.powi(2) + self.y.powi(2)).sqrt()
+    }
+}
+```
+
+## Performance of code using Generics
+there is no runtime cost when using generic type parameters. `Monomorphization` is the process of turning generic code into specific code by filling in the concrete types that are used when compiled. 
+the compiler looks at all the places where generic code is called and generates code for the concrete types the generic code is called with.
+
+
 # Traits
-like interface in TS,JS
-defines functionality of a type which can be shared to other types
-it's like a blueprint for Structs to follow
+similar to interface in TS,JS; defines functionality of a type which can be shared to other types.
+it's like a blueprint for Structs to follow.
+Trait definitions are a way to group method signatures together to define a set of behaviors necessary to accomplish some purpose.
+```rs
+pub trait Summary {
+    fn summarize(&self) -> String;
+}
+```
+
+Implementing a trait on a type is similar to implementing regular methods. The difference is that after impl, we put the trait name we want to implement, then use the for keyword, and then specify the name of the type we want to implement the trait for.
+can have multiple method in body.
+
+implement trait on a type->
+```rs
+pub struct NewsArticle {
+    pub headline: String,
+    pub location: String,
+    pub author: String,
+    pub content: String,
+}
+
+impl Summary for NewsArticle {
+    fn summarize(&self) -> String {
+        format!("{}, by {} ({})", self.headline, self.author, self.location)
+    }
+}
+```
+it is similar to implementing regular methods.Instead of adding a semicolon after each signature, we use curly brackets and fill in the method body with the specific behavior that we want the methods of the trait to have for the particular type.
+
+## Default Implementation
+have a default implementation pre-defined Then, as we implement the trait on a particular type, we can keep or override each method’s default behavior.
+the syntax for overriding a default implementation is the same as the syntax for implementing a trait method that doesn’t have a default implementation.
+
+Default implementations can call other methods in the same trait, even if those
+other methods don’t have a default implementation.
+```rs
+pub trait Summary {
+    fn summarize_author(&self) -> String;
+
+    fn summarize(&self) -> String {
+        format!("(Read more from {}...)", self.summarize_author())
+    }
+}
+```
+
 
 ## Traits as Parameters/Arguments
 `impl trait` is syntactical sugar
@@ -1532,12 +1669,134 @@ pub fn notify<T:Summary>(item:T){
 bound to single trait
 multiple trait bound-> `<T: Summary+fix>`
 
+## Trait Bound Syntax
+syntax sugar for longer form known as trait bound
+```rs
+pub fn notify<T: Summary>(item: &T) {
+    println!("Breaking news! {}", item.summarize());
+}
+```
+
+## Multiple Trait bounds with + Syntax
+say we want to use both `Summary` and `Display` implementation
+`pub fn notify(item: &(impl Summary + Display)) {`
+for generics->`pub fn notify<T: Summary + Display>(item: &T) {`
+
+## with `where` clause
+Each generic has its own trait bounds, so functions with multiple generic type parameters can contain lots of trait bound information between the function’s name and its parameter list, making the function signature hard to read.
+Use `where`->
+
+old:
+```rs
+fn some_function<T: Display + Clone, U: Clone + Debug>(t: &T, u: &U) -> i32 {
+```
+
+after `where`:
+```rs
+fn some_function<T, U>(t: &T, u: &U) -> i32
+where
+    T: Display + Clone,
+    U: Clone + Debug,
+{
+```
+## Returning Types That Implement Traits
+```rs
+fn returns_summarizable() -> impl Summary {
+    Tweet {
+        username: String::from("horse_ebooks"),
+        content: String::from(
+            "of course, as you probably already know, people",
+        ),
+        reply: false,
+        retweet: false,
+    }
+}
+```
+By using impl Summary for the return type, we specify that the returns_summarizable function returns some type that implements the Summary trait without naming the concrete type. In this case, returns_summarizable returns a Tweet, but the code calling this function doesn’t need to know that.
+
+## Using Trait Bounds to Conditionally Implement Methods
+By using a trait bound with an impl block that uses generic type parameters, we can implement methods conditionally for types that implement the specified traits.
+```rs
+use std::fmt::Display;
+
+struct Pair<T> {
+    x: T,
+    y: T,
+}
+
+impl<T> Pair<T> {
+    fn new(x: T, y: T) -> Self {
+        Self { x, y }
+    }
+}
+
+impl<T: Display + PartialOrd> Pair<T> {
+    fn cmp_display(&self) {
+        if self.x >= self.y {
+            println!("The largest member is x = {}", self.x);
+        } else {
+            println!("The largest member is y = {}", self.y);
+        }
+    }
+}
+```
+
+`Blanket Traits`: conditionally implement a trait for any type that implements another trait.
+Implementations of a trait on any type that satisfies the trait bounds. ex:
+```rs
+impl<T: Display> ToString for T {
+    // --snip--
+}
+```
+`Traits and trait bounds let us write code that uses generic type parameters to reduce duplication but also specify to the compiler that we want the generic type to have particular behavior.`
 
 # Lifetimes
+Rust requires us to annotate the relationships using generic lifetime parameters to ensure the actual references used at runtime will definitely be valid.
+so basically `lifetime is span where variable and function are valid`
+
+so like s1 and s2 has lifespan `'a`.
+so ans lifespan is intersection of both
+so basically space where s1, s2 is valid both, their return type is valid at
+their intersection
+
+say you have s2 inside s1 so return type will always will be in s2, as it is
+intersection s1 ans s2.
+
+Example->
+```rs
+fn main() {
+    let r;                // ---------+-- 'a
+                          //          |
+    {                     //          |
+        let x = 5;        // -+-- 'b  |
+        r = &x;           //  |       |
+    }                     // -+       |
+                          //          |
+    println!("r: {r}");   //          |
+}                         // ---------+
+```
+r has a lifetime of 'a but refers to memory with lifetime of 'b. hence a
+dangling pointer error cause `'b<'a`. subject doesn't lives as long as
+reference.
+
+```rs
+fn main() {
+    let x = 5;            // ----------+-- 'b
+                          //           |
+    let r = &x;           // --+-- 'a  |
+                          //   |       |
+    println!("r: {r}");   //   |       |
+                          // --+       |
+}                         // ----------+
+```
+x has lifetime `'b` >`'a`=> `r` can reference `x`
+
+
+## Function with Lifetimes
 say to print longest string b/w 2
 so u define a function longest() utilise the size function 
 now for main function u call a variable initially
-but after input you store that function into that vairable initialises initially
+but after input you store that function into that variable initialises initially
 quite weird right
 declare first, assign later
 ```rs
@@ -1560,23 +1819,34 @@ fn main(){
 
 Write a function that takes two string `references` as an input And returns the bigger amongst them
 
-so basically lifetime is span where variable and function are valid
+```rs
+&i32        // a reference
+&'a i32     // a reference with an explicit lifetime
+&'a mut i32 // a mutable reference with an explicit lifetime
+```
 
-so like s1 has lifespan `a, for s2 it is `a
-so ans lifespan is intersection of both
-so basically space where s1, s2 is valid both, their return type is valid at
-their intersection
 
-say you have s2 inside s1 so return type will always will be in s2, as it is
-intersection s1 ans s2
+consider this
+```rs
+fn longest<'a>(x: &str, y: &str) -> &'a str {
+    let result = String::from("really long string");
+    result.as_str()
+}
+```
+error because the function must return a lifetime of reference of string `a`,
+but it returns nothing like that, hence it will be a compilation error.
+
 
 ## Structs with lifeTimes
-same but struct is also treated a function
+same but struct is also treated a function.
+We can define structs to hold references, but in that case we would need to add a lifetime annotation on every reference in the struct’s definition.
+
 ```rs
 struct User<'a,'b>{
     first_name:&'a str,
     last_name:&'b str,`
 }
+//instance of User can't outlive the eference it holds in its first_name,last_name field.
 fn main(){
     let user:User;
     let first_name=String::from("Nalin");
@@ -1588,7 +1858,48 @@ fn main(){
     println!("The name of user is {}",user.first_name);
 }
 ```
+Lifetimes on function or method parameters are called input lifetimes, and lifetimes on return values are called output lifetimes.
+basically compiler has three rules to check for lifetimes of references.
+1. compiler assigns a lifetime parameter to each parameter that’s a reference.
+`fn first_word(s: &str) -> &str {` converts to `fn first_word<'a>(s: &'a str) -> &str {`
+2. if there is exactly one input lifetime parameter, that lifetime is assigned to all output lifetime parameters
+`fn first_word<'a>(s: &'a str) -> &str {` converts to `fn first_word<'a>(s: &'a str) -> &'a str {`
+3. if there are multiple input lifetime parameters, but one of them is &self or &mut self because this is a method, the lifetime of self is assigned to all output lifetime parameters.
 
+```rs
+fn longest<'a, 'b>(x: &'a str, y: &'b str) -> &str {    //fucking error, cause a dangling pointer error;we still haven’t figured out what the return type’s lifetime is.
+```
+
+## Static Lifetime
+```rs
+let s: &'static str = "I have a static lifetime.";
+//'static, which denotes that the affected reference can live for the entire duration of the program
+//basically extend the whole lifetime till the end of program
+```
+lifetime of all string literal is `'static`.
+
+## Generic Type Parameters, Trait Bounds, and Lifetimes Together
+```rs
+use std::fmt::Display;
+
+fn longest_with_an_announcement<'a, T>(
+    x: &'a str,
+    y: &'a str,
+    ann: T,
+) -> &'a str
+where
+    T: Display,
+{
+    println!("Announcement! {ann}");
+    if x.len() > y.len() {
+        x
+    } else {
+        y
+    }
+}
+```
+lifetime specified is of type `T`{generic}, hence as you pass things like a
+string passed so will implement it according to that string.
 
 # MultiThreading
 run mutliple independents parts in single process

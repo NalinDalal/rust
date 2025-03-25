@@ -6,15 +6,6 @@ fn longest(a: String, b: String) -> String {
     }
 }
 
-fn main() {
-    let longest_str;
-    let str1 = String::from("small");
-    {
-        let str2 = String::from("longer");
-        longest_str = longest(str1, str2);
-    }
-    println!("{}", longest_str);
-}
 
 //with structs
 struct User<'a,'b>{
@@ -30,5 +21,11 @@ fn main(){
         user=User{first_name:&first_name,last_name:&last_name};
     }
     println!("The name of user is {}",user.first_name);
+ let longest_str;
+    let str1 = String::from("small");
+    {
+        let str2 = String::from("longer");
+        longest_str = longest(str1, str2);
+    }
+    println!("{}", longest_str);
 }
-
