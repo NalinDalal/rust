@@ -1,5 +1,5 @@
 pub trait Summary {
-    fn Summarize(&self) -> String {
+    fn summarize(&self) -> String {
         return String::from("Summarize");
     }
 }

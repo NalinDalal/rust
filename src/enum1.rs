@@ -23,7 +23,7 @@ enum Shape {
 // Function to calculate area based on the shape
 fn calculate_area(shape: Shape) -> f64 {
     // calculates the area of the shape
-    return 0;
+    return 0.0;
 }
 
 fn main() {

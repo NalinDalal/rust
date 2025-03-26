@@ -1901,6 +1901,275 @@ where
 lifetime specified is of type `T`{generic}, hence as you pass things like a
 string passed so will implement it according to that string.
 
+# Chap 11 - Automated Test
+Correctness in our programs is the extent to which our code does what we intend it to do.
+Rust has type safety, but we can't expect it to catch everything.Rust includes support for writing automated software tests.
+
+Rust has three attributes for writing test:
+- test attribute, 
+- a few macros, and 
+- should_panic attribute.
+
+## The Anatomy of a Test Function
+Let’s create a new library project called adder that will add two numbers:
+$ cargo new adder --lib
+     Created library `adder` project
+$ cd adder
+
+change a function to test function->
+add #[test] b/f fn, run with cargo test
+```rs
+pub fn add(left: u64, right: u64) -> u64 {
+    left + right
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let result = add(2, 2);
+        assert_eq!(result, 4);
+    }
+}
+```
+Note the #[test] annotation: this attribute indicates this is a test function
+
+simply run `cargo test` to check it out.
+the cli will show you the test like:
+```bash
+$ cargo test
+   Compiling adder v0.1.0 (file:///projects/adder)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.59s
+     Running unittests src/lib.rs (target/debug/deps/adder-92948b65e88960b4)
+
+running 1 test
+test tests::exploration ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests adder
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+Note: Tests fail when something in the test function panics. Each test is run in
+a new thread, and when the main thread sees that a test thread has died, the
+test is marked as failed.
+
+## Check via `assert!` Macro
+when you want to check if a condition in a test evaluates to `true`.We give the `assert!` macro an argument that evaluates to a Boolean. If the value is `true`, nothing happens and the test passes. If the value is `false`, the `assert!` macro calls `panic!` to cause the test to fail.
+`true`->`nothing`
+`fail`->`panic`
+
+```rs
+#[cfg(test)]
+mod tests {
+    use super::*;   //tests module is an inner module, we need to bring the code under test in the outer module into the scope of the inner module. 
+
+    #[test]
+    fn larger_can_hold_smaller() {
+        let larger = Rectangle {
+            width: 8,
+            height: 7,
+        };
+        let smaller = Rectangle {
+            width: 5,
+            height: 1,
+        };
+
+        assert!(larger.can_hold(&smaller));
+    }
+
+    #[test]
+    fn smaller_cannot_hold_larger() {
+        let larger = Rectangle {
+            width: 8,
+            height: 7,
+        };
+        let smaller = Rectangle {
+            width: 5,
+            height: 1,
+        };
+
+        assert!(!smaller.can_hold(&larger));
+    }
+}
+```
+runs smoothly.
+
+## Testing Equality with the `assert_eq!` and `assert_ne!` Macros
+well we can always check the expected result and actual with `==` but STL has a pair of `macros—assert_eq!` and `assert_ne!`—to perform this test more conveniently.
+example->
+```rs
+pub fn add_two(a: usize) -> usize {
+    a + 2
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_adds_two() {
+        let result = add_two(2);
+        assert_eq!(result, 4);
+    }
+}
+```
+upon running we get ->
+```bash
+running 1 test
+test tests::it_adds_two ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+on failing testcases gives something like:
+```bash
+
+failures:
+
+---- tests::it_adds_two stdout ----
+thread 'tests::it_adds_two' panicked at src/lib.rs:12:9:
+assertion `left == right` failed
+  left: 5
+ right: 4
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```
+
+bug is caught where it tells that the assertion is failing giving us context to
+work on
+
+`assert_ne!` macro will pass if the two values we give it are not equal and fail if they’re equal.
+
+Under the surface, the `assert_eq!` and `assert_ne!` macros use the operators == and !=, respectively.
+
+## Adding Custom Failure Messages
+Custom messages are useful for documenting what an assertion means; when a test fails, you’ll have a better idea of what the problem is with the code.
+```rs
+pub fn greeting(name: &str) -> String {
+    format!("Hello {name}!")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn greeting_contains_name() {
+        let result = greeting("Carol");
+        assert!(result.contains("Carol"));
+    }
+}
+
+    #[test]
+    fn greeting_contains_name() {
+        let result = greeting("Carol");
+        assert!(
+            result.contains("Carol"),
+            "Greeting did not contain name, value was `{result}`"
+        );
+    }
+
+```
+
+O/P->
+```bash
+
+failures:
+
+---- tests::greeting_contains_name stdout ----
+thread 'tests::greeting_contains_name' panicked at src/lib.rs:12:9:
+Greeting did not contain name, value was `Hello!`
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+```
+
+## Checking for Panics with should_panic
+by adding the attribute should_panic to our test function. The test passes if the code inside the function panics; the test fails if the code inside the function doesn’t panic.
+
+```rs
+pub struct Guess {
+    value: i32,
+}
+
+impl Guess {
+    pub fn new(value: i32) -> Guess {
+        if value < 1 || value > 100 {
+            panic!("Guess value must be between 1 and 100, got {value}.");
+        }
+
+        Guess { value }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn greater_than_100() {
+        Guess::new(200);
+    }
+}
+```
+runs smoothly cause no error in the code, testing is like-> 0 failed, 1 passed
+
+say, now we introduce a bug:
+```rs
+// --snip--
+impl Guess {
+    pub fn new(value: i32) -> Guess {
+        if value < 1 {
+            panic!("Guess value must be between 1 and 100, got {value}.");
+        }
+
+        Guess { value }
+    }
+}
+```
+upon test it gives that it fails, but not a very helpful message.The failure we got means that the code in the test function did not cause a panic.
+
+## Using `Result<T, E>` in Tests
+```rs
+    #[test]
+    fn it_works() -> Result<(), String> {
+        let result = add(2, 2);
+
+        if result == 4 {
+            Ok(())
+        } else {
+            Err(String::from("two plus two does not equal four"))
+        }
+    }
+```
+The `it_works` function now has the `Result<(), String>` return type.
+
+You can’t use the ``#[should_panic]`` annotation on tests that use `Result<T, E>`. To assert that an operation returns an Err variant, don’t use the question mark operator on the `Result<T, E>` value. Instead, use `assert!(value.is_err())`.
+
+## Controlling How Tests Are Run
+`cargo test` create a binary and runs it as a test
+`cargo test --help` displays the options you can use
+`cargo test -- --help` displays option after --
+
+## Running Tests in Parallel or Consecutively
+by default they run in parallel using threads,
+things to keep in midn:
+- your tests don’t depend on each other 
+- don't depend on any shared state,
+
+`$ cargo test -- --test-threads=1`-> cmd to run
+- set the number of test threads to 1, telling the program not to use any parallelism.
+- using one thread will take longer than in parallel.
+
+## Showing Function Output
+
+
 # MultiThreading
 run mutliple independents parts in single process
 this parts are called threads
