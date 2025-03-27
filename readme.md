@@ -2168,7 +2168,65 @@ things to keep in midn:
 - using one thread will take longer than in parallel.
 
 ## Showing Function Output
+when you run `cargo test`, it only tells how many passed and how many not
+for the output use : `$ cargo test -- --show-output`
+shows o/p for every test
+```$ cargo test -- --show-output
+   Compiling silly-function v0.1.0 (file:///projects/silly-function)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.60s
+     Running unittests src/lib.rs (target/debug/deps/silly_function-160869f38cff9166)
 
+running 2 tests
+test tests::this_test_will_fail ... FAILED
+test tests::this_test_will_pass ... ok
+
+successes:
+
+---- tests::this_test_will_pass stdout ----
+I got the value 4
+
+
+successes:
+    tests::this_test_will_pass
+
+failures:
+
+---- tests::this_test_will_fail stdout ----
+I got the value 8
+thread 'tests::this_test_will_fail' panicked at src/lib.rs:19:9:
+assertion `left == right` failed
+  left: 10
+ right: 5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::this_test_will_fail
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--lib`
+```
+
+## Run Subtest by name
+just run a specific test by name rather than all of them->
+`cargo test one_hundred`
+
+## Filter to run multiple
+runs all test with some common name like `add` and `add_two`
+```sh
+cargo test add
+```
+
+## Ignore explicitly called
+just add `#[ignore]` after them
+```rs
+#[test]
+#[ignore]
+fn works(){
+let result=add(2,4);
+
+```
 
 # MultiThreading
 run mutliple independents parts in single process
