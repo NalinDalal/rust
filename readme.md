@@ -2220,6 +2220,7 @@ cargo test add
 
 ## Ignore explicitly called
 just add `#[ignore]` after them
+ignore the test function compilation
 ```rs
 #[test]
 #[ignore]
@@ -2227,6 +2228,83 @@ fn works(){
 let result=add(2,4);
 
 ```
+
+to run the ignored one-> `cargo run --ignored`
+
+## Test organization
+2 types of test are their-> `Unit`,`Integration`
+
+### Unit Testing
+test each unit of code in isolation from the rest of the code
+convention: create `test` module in each file
+module annotation: `cfg(test)`
+runs only when you run `cargo test` doesn't run on `cargo build`
+```rs
+pub fn add(left: u64, right: u64) -> u64 {
+    left + right
+}
+
+#[cfg(test)]        //cfg-configuration
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let result = add(2, 2);
+        assert_eq!(result, 4);
+    }
+}
+```
+
+### Integration Testing
+checks if code works correctly as a module, like as in collectively not file wise
+create a `test` folder next to `src` directory
+tests/integration_test.rs->
+```rs
+use adder::add_two;
+
+#[test]
+fn it_adds_two() {
+    let result = add_two(2);
+    assert_eq!(result, 4);
+}
+```
+
+o/p-->
+```bash
+$ cargo test
+   Compiling adder v0.1.0 (file:///projects/adder)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.31s
+     Running unittests src/lib.rs (target/debug/deps/adder-1082c4b063a8fbe6)
+
+running 1 test
+test tests::internal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/integration_test.rs (target/debug/deps/integration_test-1082c4b063a8fbe6)
+
+running 1 test
+test it_adds_two ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests adder
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+```
+3 parts-> unit, integration, doc
+
+The integration tests section starts with the line `Running tests/integration_test.rs`
+
+run a particular test only-> `cargo test --test test_name`
+
+### Submodules in Integration Tests
+like `integration_test.rs` and then submodule `test/common/lib.rs`
+hence it can be used anywhere as a module
 
 # MultiThreading
 run mutliple independents parts in single process
