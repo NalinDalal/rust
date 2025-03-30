@@ -2306,6 +2306,9 @@ run a particular test only-> `cargo test --test test_name`
 like `integration_test.rs` and then submodule `test/common/lib.rs`
 hence it can be used anywhere as a module
 
+# Chap 13
+# Iterators and Closures
+
 # MultiThreading
 run mutliple independents parts in single process
 this parts are called threads
