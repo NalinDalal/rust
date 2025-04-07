@@ -2308,6 +2308,19 @@ hence it can be used anywhere as a module
 
 # Chap 13
 # Iterators and Closures
+rust also supports functional program
+using functions as values by passing them in arguments, returning them from other functions, assigning them to variables for later execution, and so forth.
+
+we’ll cover:
+- Closures, a function-like construct you can store in a variable
+- Iterators, a way of processing a series of elements
+
+## Closures
+anonymous functions you can save in a variable or pass as arguments to other functions.
+define elsewhere, call elsewhere- perfectly ok
+closures can capture values from the scope in which they’re defined.
+
+
 
 # MultiThreading
 run mutliple independents parts in single process
