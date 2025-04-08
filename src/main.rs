@@ -1,3 +1,4 @@
+mod Closure;
 mod borrowing;
 mod enum1;
 mod enum2;
@@ -35,7 +36,7 @@ fn main() {
     println!("x is {}", x);
     let y: u32 = 1000;
     println!("y is unsigned integer{}", y);
-    let z: f64 = 3.14; //64 bit float no
+    let z = std::f64::consts::PI;; //64 bit float no
     println!("z is a float no{}", z);
     //by default turns to i32
 

@@ -7,6 +7,7 @@ enum ShirtColor {
 struct Inventory {
     shirts: Vec<ShirtColor>,
 }
+#[derive(Debug)]
 struct Rectangle {
     width: u32,
     height: u32,

@@ -2320,6 +2320,262 @@ anonymous functions you can save in a variable or pass as arguments to other fun
 define elsewhere, call elsewhere- perfectly ok
 closures can capture values from the scope in which they’re defined.
 
+### Capturing the Environment with Closures
+example->
+ Every so often, our t-shirt company gives away an exclusive, limited-edition shirt to someone on our mailing list as a promotion. People on the mailing list can optionally add their favorite color to their profile. If the person chosen for a free shirt has their favorite color set, they get that color shirt. If the person hasn’t specified a favorite color, they get whatever color the company currently has the most of.
+
+`Closure.rs` file-> built 3 tshirt using a `store` method, 2 blue, 1 red; called
+a `giveaway` method for both guys, one of them has a preference for a red one.
+
+### Closure Type Inference and Annotation
+Closures are typically short and relevant only within a narrow context rather than in any arbitrary scenario. Within these limited contexts, the compiler can infer the types of the parameters and the return type, similar to how it’s able to infer the types of most variables (there are rare cases where the compiler needs closure type annotations too).
+
+add type annotations if we want to increase explicitness and clarity at the cost of being more verbose than is strictly necessary.
+```rs
+    let expensive_closure = |num: u32| -> u32 {
+        println!("calculating slowly...");
+        thread::sleep(Duration::from_secs(2));
+        num
+    };
+```
+
+similar to:
+```rs
+fn  add_one_v1   (x: u32) -> u32 { x + 1 }
+let add_one_v2 = |x: u32| -> u32 { x + 1 };
+let add_one_v3 = |x|             { x + 1 };
+let add_one_v4 = |x|               x + 1  ;
+```
+1st line shows a function definition,
+2nd line shows a fully annotated closure definition.
+3rd line, we remove the type annotations from the closure definition.
+4th line, we remove the brackets, which are optional because the closure body has only one expression.
+
+For closure definitions, the compiler will infer one concrete type for each of
+their parameters and for their return value.
+
+### Capturing References or Moving Ownership
+3 ways to capture values:
+- borrowing immutably, 
+- borrowing mutably, and 
+- taking ownership
+```rs
+fn main() {
+    let list = vec![1, 2, 3];
+    println!("Before defining closure: {list:?}");
+
+    let only_borrows = || println!("From closure: {list:?}");   //way to call
+    //closure
+
+    println!("Before calling closure: {list:?}");
+    only_borrows();
+    println!("After calling closure: {list:?}");
+}
+```
+We don’t use the closure again after the closure is called, so the mutable borrow ends
+Between the closure definition and the closure call, an immutable borrow to print isn’t allowed because no other borrows are allowed when there’s a mutable borrow.ex:
+```rs
+fn main() {
+    let mut list = vec![1, 2, 3];
+
+    // Define a closure that mutably borrows `list`
+    let mut borrows_mutably = || list.push(4);
+
+    // ❗ Trying to immutably borrow here before the closure is called
+    println!("Before calling closure: {list:?}");
+
+    // Now we try to call the closure which needs a mutable borrow
+    borrows_mutably();
+}
+```
+
+`error[E0502]: cannot borrow 'list' as immutable because it is also borrowed as mutable`
+`closure` don't have like lifetimes hardcoded like it's not a thing for them,
+but if you want to enforce it then use `move` to spawn a new thread.
+```rs
+use std::thread;
+
+fn main() {
+    let list = vec![1, 2, 3];
+    println!("Before defining closure: {list:?}");
+
+    thread::spawn(move || println!("From thread: {list:?}"))
+        .join()
+        .unwrap();
+}
+```
+specify that list should be moved into the closure by putting the move keyword at the beginning of the closure definition.
+
+### Moving Captured Values Out of Closures and the Fn Traits
+Closure captures references and lifetimes, and the body itself decides what to do with it:
+- move a captured value out of the closure, 
+- mutate the captured value, 
+- neither move nor mutate the value, or 
+- capture nothing from the environment to begin with.
+
+the capturing itself decides their working.automatically implement one, two, or all three of these Fn traits:
+1. `FnOnce` applies to closures that can be called once. All closures implement this trait, cause all closures can be called. 
+A closure that moves captured values out of its body will only implement FnOnce and none of the other Fn traits, because it can only be called once.
+
+2. `FnMut` applies to closures that don’t move captured values out of their body, but that might mutate the captured values. 
+These closures can be called more than once.
+
+3. `Fn` applies to closures that don’t move captured values out of their body and that don’t mutate captured values, as well as closures that capture nothing from their environment. These closures can be called more than once without mutating their environment, which is important in cases such as calling a closure multiple times concurrently.
+example:
+```rs
+impl<T> Option<T> {
+    pub fn unwrap_or_else<F>(self, f: F) -> T
+    where
+        F: FnOnce() -> T
+    {
+        match self {
+            Some(x) => x,
+            None => f(),
+        }
+    }
+}
+```
+
+## Processing a Series of Items with Iterators
+iterators help to iterating over each item and determining when the sequence has finished.
+iterators are lazy, meaning they have no effect until you call methods that consume the iterator to use it up.
+```rs
+    let v1 = vec![1, 2, 3];
+    let v1_iter = v1.iter();
+```
+
+separate the declaration and use:
+```rs
+    let v1 = vec![1, 2, 3];
+
+    let v1_iter = v1.iter();
+
+    for val in v1_iter {
+        println!("Got: {val}");
+    }
+```
+
+
+## The `Iterator` Trait and the `next` Method
+```rs
+pub trait Iterator {
+    type Item;
+
+    fn next(&mut self) -> Option<Self::Item>;
+
+    // methods with default implementations elided
+}
+```
+`Item` is type of return value
+implementing this method->
+```rs
+    #[test]
+    fn iterator_demonstration() {
+        let v1 = vec![1, 2, 3];
+
+        let mut v1_iter = v1.iter();
+
+        assert_eq!(v1_iter.next(), Some(&1));
+        assert_eq!(v1_iter.next(), Some(&2));
+        assert_eq!(v1_iter.next(), Some(&3));
+        assert_eq!(v1_iter.next(), None);
+    }
+
+```
+code consumes, or uses up, the iterator
+`iter`->the values we get from the calls to next are immutable references to the values in the vector
+`into_iter`-> iterator that takes ownership of v1 and returns owned values
+`iter_mut`-> iterate over mutable references
+
+## Methods that Consume the Iterator
+various implementation in stl
+Methods that call `next` are called **consuming adapters** b/c upon calling them
+they are consumed.
+```rs
+    #[test]
+    fn iterator_sum() {
+        let v1 = vec![1, 2, 3];
+
+        let v1_iter = v1.iter();
+
+        let total: i32 = v1_iter.sum();
+
+        assert_eq!(total, 6);
+    }
+```
+We aren’t allowed to use v1_iter after the call to sum because sum takes ownership of the iterator we call it on.
+
+## Methods that Produce Other Iterators
+Iterator adapters are methods defined on the Iterator trait that don’t consume the iterator.call the iterator adapter method map, which takes a closure to call on each item as the items are iterated through .
+map method returns a new iterator that produces the modified items.
+```rs
+    let v1: Vec<i32> = vec![1, 2, 3];
+
+    v1.iter().map(|x| x + 1);
+```
+produces warning, b/c the iterator is not consumed, do like: `let _ = v1.iter().map(|x| x + 1);`
+
+## Using Closures that Capture Their Environment
+iteraotrs use closure as argument, if closure is true then include item, else
+skip
+closure gets an item from the iterator and returns a bool
+```rs
+#[derive(PartialEq, Debug)]
+struct Shoe {
+    size: u32,
+    style: String,
+}
+
+fn shoes_in_size(shoes: Vec<Shoe>, shoe_size: u32) -> Vec<Shoe> {       //takes ownership of a vector of shoes and a shoe size as parameters.
+    shoes.into_iter().filter(|s| s.size == shoe_size).collect()
+    //call into_iter to create an iterator that takes ownership of the vector.
+    //filter to adapt that iterator into a new iterator that only contains elements for which the closure returns true.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn filters_by_size() {
+        let shoes = vec![
+            Shoe {
+                size: 10,
+                style: String::from("sneaker"),
+            },
+            Shoe {
+                size: 13,
+                style: String::from("sandal"),
+            },
+            Shoe {
+                size: 10,
+                style: String::from("boot"),
+            },
+        ];
+
+        let in_my_size = shoes_in_size(shoes, 10);
+
+        assert_eq!(
+            in_my_size,
+            vec![
+                Shoe {
+                    size: 10,
+                    style: String::from("sneaker")
+                },
+                Shoe {
+                    size: 10,
+                    style: String::from("boot")
+                },
+            ]
+        );
+    }
+}
+```
+
+## Loops v/s Iterators
+say we look for a word in a string with help of both `iter` and `for`, both have
+same performance, not once one is fast than other
+implementations of closures and iterators are such that runtime performance is not affected
 
 
 # MultiThreading
