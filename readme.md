@@ -2647,6 +2647,49 @@ use it like:
 use art::kinds::PrimaryColor;
 use art::utils::mix;
 ```
+now the problem here is that need to remember what is where
+hence to prevent further confusion for user do like:
+```rs
+//! # Art
+//!
+//! A library for modeling artistic concepts.
+
+pub use self::kinds::PrimaryColor;
+pub use self::kinds::SecondaryColor;
+pub use self::utils::mix;
+
+pub mod kinds {
+    // --snip--
+}
+
+pub mod utils {
+    // --snip--
+}
+```
+
+to publish crates, need to have a crate account, login on `crates.io/me` with
+github, get api key, then on terminal `cargo login` paste the key
+add metadata in cargo.toml file then `cargo publish` to publish the crate
+```toml
+[package]
+name = "guessing_game"
+version = "0.1.0"
+edition = "2021"
+description = "A fun game where you guess what number the computer has chosen."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+```
+
+`cargo yank`- prevent new projects from depending on a specific version of a crate that's already been published to crates.io.
+avoid the dependency we provide in args
+
+```sh
+$ cargo yank --vers 1.0.1   #yank version 1.0.1
+$ cargo yank --vers 1.0.1 --undo    #undo the yank
+```
+
+## 14.3 Cargo Workspace
 
 # MultiThreading
 run mutliple independents parts in single process
