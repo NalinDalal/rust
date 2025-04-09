@@ -2578,6 +2578,75 @@ same performance, not once one is fast than other
 implementations of closures and iterators are such that runtime performance is not affected
 
 # Chap 14
+# Cargo and Crates
+Cargo can help to manage packages on rust, crates is sort of standard place to
+publish libraries for rust, install binaries from there.
+
+## Customising build with release profile
+release profiles are predefined and customizable profiles with different configurations that allow a programmer to have more control over various options for compiling code.
+2 profiles: `dev` and `release`
+`dev` : when we run `cargo build`
+`release`: when we run `cargo build --release`
+can control the build with help of Cargo.toml file
+```toml
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3       #controls the number of optimizations
+```
+keep it as it is, cause in release mod upon more compilation it takes more time
+hence affecting prod.
+
+## Publishing a Crate to Crates.io
+
+do comments in code you are going to publish as packages
+given description,
+then heading
+
+    /// Adds one to the number given.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let arg = 5;
+    /// let answer = my_crate::add_one(arg);
+    ///
+    /// assert_eq!(6, answer);
+    /// ```
+    pub fn add_one(x: i32) -> i32 {
+        x + 1
+    }
+
+
+then code snippet
+run `cargo doc --open`; it will build the HTML for your current crate’s documentation.
+
+## Documentation Comments as Tests
+`cargo test` will run the code examples in your documentation as tests! 
+after this if u change it, it crash and the code `panics`
+
+## Commenting Contained Items
+`//!` adds the comments as documentation itself
+
+## Exporting a Convenient Public API with pub use
+like use a `pub` function
+define a `public` module, have a `public` module
+then u can import it.
+```rs
+//! # Art
+//!
+//! A library for modeling artistic concepts.
+
+pub mod kinds {
+    /// The primary colors according to the RYB color model.
+    pub enum PrimaryColor {
+```
+use it like:
+```rs
+use art::kinds::PrimaryColor;
+use art::utils::mix;
+```
 
 # MultiThreading
 run mutliple independents parts in single process
