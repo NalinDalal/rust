@@ -2577,6 +2577,7 @@ say we look for a word in a string with help of both `iter` and `for`, both have
 same performance, not once one is fast than other
 implementations of closures and iterators are such that runtime performance is not affected
 
+# Chap 14
 
 # MultiThreading
 run mutliple independents parts in single process
