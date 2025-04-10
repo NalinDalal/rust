@@ -2690,6 +2690,76 @@ $ cargo yank --vers 1.0.1 --undo    #undo the yank
 ```
 
 ## 14.3 Cargo Workspace
+you want to split your package further into multiple library crates. -> use `Cargo Workspace`
+they can help manage multiple related packages that are developed in tandem.
+
+A workspace is a set of packages that share the same Cargo.lock and output directory
+to get started, make a normal rust project or intitalise a empty directory with
+cargo
+```toml
+[workspace]
+resolver = "2"
+```
+
+create the adder binary crate by running cargo new within the add directory:
+```sh
+cargo new adder
+```
+it add a new rust project inside current rust project
+
+note: `even after initialising the nested rust directory, there exist only one
+target folder`
+
+say u add another directory, and want to use one into other, update the toml
+file as:
+```toml
+[dependencies]
+add_one = { path = "../add_one" }
+```
+
+To run the binary crate from the add directory, we can specify which package in the workspace we want to run by using the -p argument and the package name with cargo run:
+```sh
+$ cargo run -p adder
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running `target/debug/adder`
+Hello, world! 10 plus one is 11!
+```
+
+### External Packages
+go to `Cargo.toml` file of required project; add following:
+```toml
+[dependencies]
+rand = "0.8.5"
+```
+
+## Adding a Test to a Workspace
+let’s add a test of the `add_one::add_one` function within the `add_one` crate:
+```rs
+pub fn add_one(x: i32) -> i32 {
+    x + 1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        assert_eq!(3, add_one(2));
+    }
+}
+```
+
+to run it down:
+`$ cargo test -p add_one`
+
+All binaries installed with cargo install are stored in the installation root’s bin folder
+```sh
+cargo install ripgrep
+```
+
+# Chap 15
+# Smart Pointer
 
 # MultiThreading
 run mutliple independents parts in single process
