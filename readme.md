@@ -2760,7 +2760,100 @@ cargo install ripgrep
 
 # Chap 15
 # Smart Pointer
+pointer we know that they point to something
+in Rust they are known by name `References`
+now rust has some complex pointer also
+Smart pointer enables you to allow data to have multiple owners by keeping track of the number of owners and, when no owners remain, cleaning up the data.
 
+
+while references only borrow data, in many cases, smart pointers own the data they point to.
+
+implemented using structs.they implement the `Deref` and `Drop` traits.
+- `Deref trait` allows an instance of the smart pointer struct to behave like a reference so you can write your code to work with either references or smart pointers
+- `Drop trait` allows you to customize the code that’s run when an instance of the smart pointer goes out of scope
+
+We'll cover :`Box<T>`,`Rc<T>`,`Ref<T>`
+- `Box<T>` for allocating values on the heap
+- `Rc<T>`, a reference counting type that enables multiple ownership
+- `Ref<T>` and `RefMut<T>`, accessed through `RefCell<T>`, a type that enforces the borrowing rules at runtime instead of compile time
+
+## `Box<T>`
+most straightforward smart pointer
+store data on the heap
+
+uised in these situations:
+- When you have a type whose size can’t be known at compile time and you want to use a value of that type in a context that requires an exact size
+- When you have a large amount of data and you want to transfer ownership but ensure the data won’t be copied when you do so
+- When you want to own a value and you care only that it’s a type that implements a particular trait rather than being of a specific type
+
+### Using Box<T> to store data on Heap
+```rs
+fn main() {
+    let b = Box::new(5);
+    println!("b = {b}");
+}
+```
+variable b to have the value of a Box that points to the value 5, which is allocated on the heap.
+when a box goes out of scope, as b does at the end of main, it will be deallocated.
+
+a case where boxes allow us to define types that we wouldn’t be allowed to if we didn’t have boxes.
+
+### Enabling Recursive Types with Boxes
+A value of recursive type can have another value of the same type as part of itself.
+issue: `Rust needs to known how much space is going to be used`
+Solution: Use a `Con` list
+
+#### Con List
+introduced in lisp
+made up of nested pairs, and is the Lisp version of a linked list.
+ex: `(1, (2, (3, Nil)))`
+
+2 parts: `value of the current item and the next item`
+last item: only a value called Nil without a next item
+ex:
+```rs
+enum List {
+    Cons(i32, List),
+    Nil,
+}
+```
+
+
+ex: Storing 1,2,3
+```rs
+use crate::List::{Cons, Nil};
+
+fn main() {
+    let list = Cons(1, Cons(2, Cons(3, Nil)));
+}
+```
+
+shows error on compilation, says infinite size
+`Cons` needs an amount of `space` equal to the size of an `i32` plus the size of a `List`.
+like say a Con has i32, and then other cons
+`Con={i32+Con}`
+
+#### Using `Box<T>` to Get a Recursive Type with a Known Size
+instead of storing a value directly, we should change the data structure to store the value indirectly by storing a pointer to the value instead.
+
+```rs
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
+}
+
+use crate::List::{Cons, Nil};
+
+fn main() {
+    let list = Cons(1, Box::new(Cons(2, Box::new(Cons(3, Box::new(Nil))))));
+}
+```
+
+`Box<T>` type is a smart pointer because it implements the `Deref trait`, which allows `Box<T>` values to be treated like `references`. 
+When a `Box<T>` value goes out of scope, the `heap data` that the box is pointing to is `cleaned up` as well because of the Drop trait implementation.
+
+## Treating Smart Pointers Like Regular References with the Deref Trait
+15.2
 # MultiThreading
 run mutliple independents parts in single process
 this parts are called threads
