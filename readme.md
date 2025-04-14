@@ -2852,8 +2852,235 @@ fn main() {
 `Box<T>` type is a smart pointer because it implements the `Deref trait`, which allows `Box<T>` values to be treated like `references`. 
 When a `Box<T>` value goes out of scope, the `heap data` that the box is pointing to is `cleaned up` as well because of the Drop trait implementation.
 
-## Treating Smart Pointers Like Regular References with the Deref Trait
-15.2
+## Treating Smart Pointers Like Regular References with the `Deref` Trait
+`Deref` trait allows you to customize the behavior of the dereference operator `*`
+`Deref` trait makes it possible for smart pointers to work in ways similar to references.
+
+### Following the Pointer to the Value
+A regular reference is a type of pointer, and one way to think of a pointer is as an arrow to a value stored somewhere else
+so `&x` is reference; `*y` is dereference
+```rs
+fn main() {
+    let x = 5;
+    let y = &x;
+
+    assert_eq!(5, x);
+    assert_eq!(5, *y);  //use *y to follow the reference to the value it’s pointing to
+}
+```
+compilation gives error b/c Comparing a number and a reference to a number isn’t allowed because they’re different types. We must use the dereference operator to follow the reference to the value it’s pointing to.
+
+### Using `Box<T>` Like a Reference
+```rs
+fn main() {
+    let x = 5;
+    let y = Box::new(x);
+
+    assert_eq!(5, x);
+    assert_eq!(5, *y);
+}
+```
+box copies over value of x and y is it's instamce
+
+### Defining Our Own Smart Pointer
+how smart pointers behave differently from references by default. 
+`Box<T>` type is ultimately defined as a tuple struct with one element;
+Similarly:
+```rs
+struct MyBox<T>(T); //struct is defined, a generic parameter T is declared
+
+impl<T> MyBox<T> {
+    fn new(x: T) -> MyBox<T> {  //MyBox::new function takes one parameter of type T and returns a MyBox instance that holds the value passed in.
+        MyBox(x)
+    }
+}
+```
+then run it in:
+```rs
+fn main() {
+    let x = 5;
+    let y = MyBox::new(x);
+
+    assert_eq!(5, x);
+    assert_eq!(5, *y);
+}
+```
+gives error cause rust doesn't knows how to dereference.
+Our MyBox<T> type can’t be dereferenced because we haven’t implemented that ability on our type.
+
+### Treating a Type Like a Reference by Implementing the Deref Trait
+The Deref trait, provided by the standard library, requires us to implement one method named deref that borrows self and returns a reference to the inner data.
+```rs
+use std::ops::Deref;
+
+impl<T> Deref for MyBox<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0     //filled with it so deref returns a reference to the value we want to access with the * operator
+    }
+}
+```
+Without the Deref trait, the compiler can only dereference & references.
+
+### Implicit Deref Coercions with Functions and Methods
+Deref coercion converts a reference to a type that implements the Deref trait
+into a reference to another type.
+ex: deref coercion can convert `&String` to `&str` because String implements the Deref trait such that it returns &st
+- Deref coercion is a convenience Rust performs on arguments to functions and methods, and works only on types that implement the Deref trait. 
+- It happens automatically when we pass a reference to a particular type’s value as an argument to a function or method that doesn’t match the parameter type in the function or method definition. 
+ex:
+```rs
+fn hello(name: &str) {
+    println!("Hello, {name}!");
+}
+fn main() {
+    let m = MyBox::new(String::from("Rust"));   //Rust can turn &MyBox<String> into &String by calling deref
+    hello(&m);      //function with the argument &m, which is a reference to a MyBox<String> value
+}
+```
+`(*m)` dereferences the `MyBox<String>` into a `String`
+
+### How Deref Coercion Interacts with Mutability
+Rust does deref coercion when it finds types and trait implementations in three cases:
+
+- From `&T` to `&U` when `T: Deref<Target=U>`
+- From `&mut T` to `&mut U` when `T: DerefMut<Target=U>`
+- From `&mut T` to `&U` when `T: Deref<Target=U>`
+
+## Running Code on Cleanup with the Drop Trait
+The second trait important to the smart pointer pattern is Drop, which lets you customize what happens when a value is about to go out of scope
+drop basically is used to clear the memory
+when a Box<T> is dropped it will deallocate the space on the heap that the box points to.
+ex:
+```rs
+struct CustomSmartPointer {
+    data: String,
+}
+
+impl Drop for CustomSmartPointer {
+    fn drop(&mut self) {
+        println!("Dropping CustomSmartPointer with data `{}`!", self.data);
+    }
+}
+
+fn main() {
+    let c = CustomSmartPointer {
+        data: String::from("my stuff"),
+    };
+    let d = CustomSmartPointer {
+        data: String::from("other stuff"),
+    };
+    println!("CustomSmartPointers created.");
+}
+```
+```sh
+CustomSmartPointers created.
+Dropping CustomSmartPointer with data `other stuff`!
+Dropping CustomSmartPointer with data `my stuff`!
+```
+Rust automatically called drop for us when our instances went out of scope, calling the code we specified.
+
+### Dropping a Value Early with `std::mem::drop`
+want to clean up a value early
+
+Rust doesn’t let you call the `Drop` trait’s `drop` method manually; instead you have to call the `std::mem::drop` function provided by the standard library if you want to force a value to be dropped before the end of its scope.
+```rs
+fn main() {
+    let c = CustomSmartPointer {
+        data: String::from("some data"),
+    };
+    println!("CustomSmartPointer created.");
+    c.drop();
+    println!("CustomSmartPointer dropped before the end of main.");
+}
+```
+
+gives error telling that we’re not allowed to explicitly call `drop`.
+b/c rust also automatically calls `drop` a end of `main` function leading to
+double memory free
+
+custom:
+```rs
+fn main() {
+    let c = CustomSmartPointer {
+        data: String::from("some data"),
+    };
+    println!("CustomSmartPointer created.");
+    drop(c);
+    println!("CustomSmartPointer dropped before the end of main.");
+}
+```
+no error
+
+## 15.4 Rc<T>, the Reference Counted Smart Pointer
+consider a example where a single value has multiple owner, ex: `graph`.
+multiple edges might point to the same node, and that node is conceptually owned by all of the edges that point to it. 
+A node shouldn’t be cleaned up unless it doesn’t have any edges pointing to it and so has no owners.
+
+hence use `Rc<T>`;keeps track of the number of references to a value to
+determine whether or not the value is still in use.
+
+### Using `Rc<T>` to Share Data
+We’ll create list a that contains 5 and then 10. Then we’ll make two more lists: b that starts with 3 and c that starts with 4. Both b and c lists will then continue on to the first a list containing 5 and 10. 
+```md
+        b(3)
+         |
+        a(5)
+       /   \
+    a(10)  a(Nil)
+         |
+        c(4)
+```
+```rs
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
+}
+
+use crate::List::{Cons, Nil};
+
+fn main() {
+    let a = Cons(5, Box::new(Cons(10, Box::new(Nil))));
+    let b = Cons(3, Box::new(a));
+    let c = Cons(4, Box::new(a));
+}
+```
+error: The Cons variants own the data they hold, so when we create the b list, a is moved into b and b owns a. Then, when we try to use a again when creating c, we’re not allowed to because a has been moved.
+
+Instead, we’ll change our definition of List to use Rc<T> in place of Box<T>
+```rs
+enum List {
+    Cons(i32, Rc<List>),
+    Nil,
+}
+
+use crate::List::{Cons, Nil};
+use std::rc::Rc;
+
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    let b = Cons(3, Rc::clone(&a)); //conv is to call Rc::clone(&a) instead of a.clone()
+    let c = Cons(4, Rc::clone(&a)); //doesn't makes any deep copy, only increments the reference count
+}
+```
+
+### Cloning an `Rc<T>` Increases the Reference Count
+```rs
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    println!("count after creating a = {}", Rc::strong_count(&a));
+    let b = Cons(3, Rc::clone(&a));
+    println!("count after creating b = {}", Rc::strong_count(&a));
+    {
+        let c = Cons(4, Rc::clone(&a));
+        println!("count after creating c = {}", Rc::strong_count(&a));
+    }
+    println!("count after c goes out of scope = {}", Rc::strong_count(&a));
+}
+```
+
+
 # MultiThreading
 run mutliple independents parts in single process
 this parts are called threads
