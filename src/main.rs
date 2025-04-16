@@ -1,5 +1,6 @@
 mod Closure;
 mod borrowing;
+mod channel;
 mod enum1;
 mod enum2;
 mod error;
@@ -20,6 +21,7 @@ mod macro3;
 mod macro4;
 mod memory;
 mod method;
+mod mpsc;
 mod number;
 mod option_enum;
 mod packages;
@@ -29,14 +31,13 @@ mod structs;
 mod thread;
 mod trait1;
 mod vector;
-
 fn main() {
     println!("Hello, world!");
     let x: i32 = 5;
     println!("x is {}", x);
     let y: u32 = 1000;
     println!("y is unsigned integer{}", y);
-    let z = std::f64::consts::PI;; //64 bit float no
+    let z = std::f64::consts::PI; //64 bit float no
     println!("z is a float no{}", z);
     //by default turns to i32
 

@@ -1,16 +1,19 @@
 use std::{
     sync::mpsc,
-    thread::{self,spwan};
-}
+    thread::{self, spawn},
+};
+fn main() {
+    let (tx, rx) = mpsc::channel();
 
-    fn main(){
-    let (tx,rx)=mpsc::channel();
+    // Spawn a thread to send a message
+
     spawn(move || {
-        ts.send(String)::from("hello world"));
+        tx.send(String::from("hello world")).unwrap(); //unwrap to handle result
     });
 
-    match value{
-        Ok(value)=>println!("{}",value);
-Err(err)=>println!("Error while reading the data"),
+    //Receive the message
+    match rx.recv() {
+        Ok(value) => println!("{}", value),
+        Err(err) => println!("Error while reading the data: {}", err),
     }
 }

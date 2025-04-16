@@ -3361,7 +3361,21 @@ deafult count of strong one is still 1, and count of weak is now increased to 1
 
 ex: creating a tree-> `tree.rs`
 
-# MultiThreading
+# Chap 16
+# Fearless Concurrency
+Concurrent programming: where different parts of a program execute independently.
+parallel programming: where different parts of a program execute at the same time
+
+ownership and type systems are a powerful set of tools to help manage memory safety and concurrency problems!
+you can fix your code while you’re working on it rather than potentially after it has been shipped to production.
+topics to be covered:
+- How to create threads to run multiple pieces of code at the same time
+- Message-passing concurrency, where channels send messages between threads
+- Shared-state concurrency, where multiple threads have access to some piece of data
+- The Sync and Send traits, which extend Rust’s concurrency guarantees to user-defined types as well as types provided by the standard library
+
+
+# 16.1 MultiThreading
 run mutliple independents parts in single process
 this parts are called threads
 an executed program’s code is run in a process, and the operating system will manage multiple processes at once. Within a program, you can also have independent parts that run simultaneously. The features that run these independent parts are called threads.
@@ -3370,15 +3384,245 @@ ex: `thread.rs`
 
 We’ll often use the `move` keyword with closures passed to `thread::spawn` because the closure will then take ownership of the values it uses from the environment, thus transferring ownership of those values from one thread to another. In the “Capturing References or Moving Ownership” section of Chapter 13, we discussed move in the context of closures. Now, we’ll concentrate more on the interaction between move and thread::spawn.
 
-# Message Passing/Channel
+since multithreading means to run 2/more code simultaneously, it may lead to:
+- Race conditions, where threads are accessing data or resources in an inconsistent order
+- Deadlocks, where two threads are waiting for each other, preventing both threads from continuing
+- Bugs that happen only in certain situations and are hard to reproduce and fix reliably
+
+**Rust standard library uses a 1:1 model of thread implementation, whereby a program uses one operating system thread per one language thread.**
+
+To create a new thread, we call the thread::spawn function and pass it a closure
+```rs
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    thread::spawn(|| {
+        for i in 1..10 {
+            println!("hi number {i} from the spawned thread!");
+            thread::sleep(Duration::from_millis(1));        //thread::sleep is
+            //responsible for force stopping the thread for a small amount of time
+        }
+    });
+
+    for i in 1..5 {
+        println!("hi number {i} from the main thread!");
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+```
+
+## Waiting for All Threads to Finish Using join Handles
+spawned thread are stopped prematurely b/c:
+- due to the main thread ending
+- there is no guarantee on the order in which threads run
+- can’t guarantee that the spawned thread will get to run at all!
+
+fix: save the return value of `thread::spawn` in a variable
+return type `JoinHandle`. `JoinHandle` is an owned value that, when we call the `join` method on it, will wait for its thread to finish.
+```rs
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("hi number {i} from the spawned thread!");
+            thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    for i in 1..5 {
+        println!("hi number {i} from the main thread!");
+        thread::sleep(Duration::from_millis(1));
+    }
+
+    handle.join().unwrap();
+}
+```
+first main then spawned one, then main then spawned one, when the main is
+completed spawned runs freely, notice not asynchronous, but synchronization run
+time.
+
+move handle.join() before the for loop in main, like this:
+```rs
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("hi number {i} from the spawned thread!");
+            thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    handle.join().unwrap();
+
+    for i in 1..5 {
+        println!("hi number {i} from the main thread!");
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+```
+first the spawned one runs completely then the main thread runs
+
+**Note: Small details, such as where `join` is called, can affect whether or not your threads run at the same time.**
+
+### Using move Closures with Threads
+use the `move` keyword with closures passed to `thread::spawn` because the closure will then take ownership of the values it uses from the environment, thus transferring ownership of those values from one thread to another. 
+
+note: thread::spawn doesn't takes any arguments, but it needs to capture the value; ex:
+```rs
+use std::thread;
+
+fn main() {
+    let v = vec![1, 2, 3];
+
+    let handle = thread::spawn(|| {
+        println!("Here's a vector: {v:?}");
+    });
+
+    handle.join().unwrap();
+}
+```
+closure uses v, so it will capture v and make it part of the closure’s environment
+but thread::spawn runs it in new env, hence need to be accessible their, so rust
+borrows it, but can't tell how much long the thread will run so the ref can't ve
+validated for specific time.
+
+consider:
+```rs
+use std::thread;
+
+fn main() {
+    let v = vec![1, 2, 3];
+
+    let handle = thread::spawn(|| {
+        println!("Here's a vector: {v:?}");
+    });
+
+    drop(v); // oh no!
+
+    handle.join().unwrap();
+}
+```
+here the v is running in a thread and main function, now thread runs for how
+long can't say, and when the main drops it.when the spawned thread starts to execute, v is no longer valid, so a reference to it is also invalid.
+
+solution:
+```rs
+use std::thread;
+
+fn main() {
+    let v = vec![1, 2, 3];
+
+    let handle = thread::spawn(move || {
+        println!("Here's a vector: {v:?}");
+    });
+
+    handle.join().unwrap();
+}
+```
+
+```sh
+Here's a vector: [1, 2, 3]
+```
+
+## 16.2 | Using Message Passing to Transfer Data Between Threads | Message Passing/Channel
+A channel is a general programming concept by which data is sent from one thread to another.
+
+
 passing over a variable, lie delegating a process in parts to 10 diff cpu, or core
-channel, 2 part: transmitter and receiver
 A channel has two halves: a transmitter and a receiver. 
-The transmitter half is the upstream location where you put rubber ducks into the river, and the receiver half is where the rubber duck ends up downstream. 
+The transmitter half is the upstream location where you put rubber ducks into the river, and 
+the receiver half is where the rubber duck ends up downstream. 
 One part of your code calls methods on the transmitter with the data you want to send, and another part checks the receiving end for arriving messages. 
 A channel is said to be closed if either the transmitter or receiver half is dropped.
+```rs
+use std::sync::mpsc;
+use std::thread;
+ 
+fn main(){
+    let (tx,rx)=mpsc::channel();    //returns a tuple of two channel: sender end, receiver end
+    //tx: transmitter end; rx: receiver end
+    thread::spawn(move || {
+        tx.send((String)::from("hello world"));
+        //send method to send some data
+        //returns a Result<T, E> type; handles error bydefault
+    });
+let received = rx.recv().unwrap();
+    println!("Got: {received}");
+    match value{
+        Ok(value)=>println!("{}",value);
+Err(err)=>println!("Error while reading the data"),
+    }
+}
+```
 
 `channel.rs` file
+`msgpassing.rs` file -> message passing b/w files
+
+### Channels and Ownership Transference
+consider following code:
+```rs
+thread::spawn(move || {
+        let val = String::from("hi");
+        tx.send(val).unwrap();
+        println!("val is {val}");
+    });
+```
+why do you this is wrong?
+it is wrong b/c the `val` data is sent, hence anything may happen with it, say
+that antoher thread deletes it, so when calling the print , it may lead to
+dangling pointer error, make sense right.
+`send` function takes ownership of its parameter, and 
+when the value is moved, the `receiver` takes ownership of it
+
+
+### Sending multiple values and receiving them
+```rs
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let vals = vec![
+            String::from("hi"),
+            String::from("from"),
+            String::from("the"),
+            String::from("thread"),
+        ];
+        //create a thread
+
+        for val in vals {
+            tx.send(val).unwrap();  //contents of thread are sent
+            thread::sleep(Duration::from_secs(1));  //have a delay/pause of 1 second
+        }
+    });
+
+    for received in rx {    //rx is treated as iterator
+        println!("Got: {received}");
+    }
+}
+```
+
+```sh
+Got: hi
+Got: from
+Got: the
+Got: thread
+
+```
+
+### Creating Multiple Producers by Cloning the Transmitter
+`mpsc` - multiple producer, single consumer
+`mpsc.rs`
+
+## 16.3 Shared State Concurrency
 
 # Macro
 basically to expand single line into multiple lines
