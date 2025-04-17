@@ -3623,6 +3623,169 @@ Got: thread
 `mpsc.rs`
 
 ## 16.3 Shared State Concurrency
+handling concurrency:
+- Message passing
+- multiple threads to access the same shared data
+
+### Using Mutexes to Allow Access to Data from One Thread at a Time
+a `Mutex(mutual exclusion)` allows only one thread to access some data at any given time. guarding the data it holds via the locking system.
+2 rules:
+- You must attempt to acquire the lock before using the data.
+- When you’re done with the data that the mutex guards, you must unlock the data so other threads can acquire the lock.
+
+ex: a panel discussion at a conference with only one microphone. Before a panelist can speak, they have to ask or signal that they want to use the microphone. When they get the microphone, they can talk for as long as they want to and then hand the microphone to the next panelist who requests to speak. If a panelist forgets to hand the microphone off when they’re finished with it, no one else is able to speak. If management of the shared microphone goes wrong, the panel won’t work as planned!
+
+It is a smart pointer
+
+#### API of `Mutex<T>`
+ex:
+```rs
+use std::sync::Mutex;
+
+fn main() {
+    let m = Mutex::new(5);
+
+    {
+        let mut num = m.lock().unwrap();    //lock() used to acquire the locks
+//all to lock would fail if another thread holding the lock panicked; fails and
+//panic if other prcoess is holding lock
+        *num = 6;
+    }
+
+    println!("m = {m:?}");
+}
+```
+
+the call to `lock` returns a smart pointer called **MutexGuard**, wrapped in a **LockResult** that we handled with the call to unwrap
+
+MutexGuard smart pointer implements Deref to point at our inner data
+
+a Drop implementation that releases the lock automatically when a MutexGuard goes out of scope,
+
+### Sharing a Mutex<T> Between Multiple Threads
+spin upto 10 threads as the times goes on from 0 to 10 using `mutex<T>`.
+```rs
+use std::sync::Mutex;
+use std::thread;
+
+fn main() {
+    let counter = Mutex::new(0);
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+closure: one that moves the counter into the thread, acquires a lock on the Mutex<T> by calling the lock method, and then adds 1 to the value in the mutex. 
+When a thread finishes running its closure, num will go out of scope and release the lock so another thread can acquire it.
+doesn't compiles because: we can’t move the ownership of counter into multiple threads
+
+### Multiple Ownership with Multiple Threads
+wrap the `Mutex<T>` in `Rc<T>` and clone the `Rc<T>` before moving ownership to the thread.
+```rs
+use std::rc::Rc;
+use std::sync::Mutex;
+use std::thread;
+
+fn main() {
+    let counter = Rc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Rc::clone(&counter);
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+compiler syas thst:
+`Rc<Mutex<i32>>` cannot be sent between threads safely -> the trait `Send` is not implemented for `Rc<Mutex<i32>>`
+
+### Atomic Reference Counting with `Arc<T>`
+`Arc<T>` is a type like `Rc<T>`
+- safe to use in concurrent situations. 
+- `a` stands for atomic, meaning it’s an atomically reference counted type
+
+atomics work like primitive types but are safe to share across threads.
+then why not use `Arc<T>` by-default: thread safety comes with a performance penalty.
+fix: `mut-thread.rs`
+```rs
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+
+## 16.4 Extensible Concurrency with the `Sync` and `Send` Traits
+`Send` is use to transwfer the ownership of values of the type implementing Send can be transferred between threads.
+exception:
+Rc<T>: this cannot be Send because if you cloned an Rc<T> value and tried to transfer ownership of the clone to another thread, both threads might update the reference count at the same time.
+
+### Allowing Access from Multiple Threads with `Sync`
+
+- The `Sync` marker trait means a type can be safely referenced from multiple threads.
+- A type `T` is `Sync` if `&T` (an immutable reference to `T`) is `Send`.
+- If `&T` can be safely sent to another thread, then `T` is `Sync`.
+- Primitive types are `Sync`.
+- Types composed entirely of `Sync` types are also `Sync`.
+
+- `Rc<T>` is **not** `Sync` (same reason it's not `Send`).
+- `RefCell<T>` and related `Cell<T>` types are **not** `Sync`:
+  - Their runtime borrow checking is not thread-safe.
+- `Mutex<T>` **is** `Sync`:
+  - Allows shared access across threads.
+
+
+### Implementing `Send` and `Sync` Manually Is Unsafe
+
+- Types composed of `Send` and `Sync` types are automatically also `Send` and `Sync`.
+- These traits are marker traits (no methods to implement).
+- Enforce concurrency-related safety.
+
+- Manually implementing `Send` or `Sync` is unsafe:
+  - Requires `unsafe` Rust.
+  - Needs careful consideration to maintain safety guarantees.
 
 # Macro
 basically to expand single line into multiple lines
