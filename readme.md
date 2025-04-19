@@ -3787,6 +3787,158 @@ Rc<T>: this cannot be Send because if you cloned an Rc<T> value and tried to tra
   - Requires `unsafe` Rust.
   - Needs careful consideration to maintain safety guarantees.
 
+# Chap 17
+# Fundamentals of Asynchronous Programming: Async, Await, Futures, and Streams
+asynchronous rust is as same as asynchronous js
+no two threads will run simultaneously let alone process.
+only one process runs at a time
+consider:
+If you had only one CPU core and your operating system didn’t pause that export until it completed—that is, if it executed the export synchronously—you couldn’t do anything else on your computer while that task was running. 
+That would be a pretty frustrating experience right.
+
+Fortunately, your computer’s operating system can, and does, invisibly interrupt the export often enough to let you get other work done simultaneously.
+
+import a video from a friend, takes time
+now if you open it it will take 1-2 seconds, which not much for human, but for
+computer that's a eternity.
+
+here, the operating system’s invisible interrupts provide a form of concurrency.
+That concurrency happens only at the level of the entire program
+
+We could avoid blocking our main thread by spawning a dedicated thread to download each file. However, the overhead of those threads would eventually become a problem. It would be preferable if the call didn’t block in the first place. It would also be better if we could write in the same direct style we use in blocking code, similar to this:
+
+```rs
+let data = fetch_data_from(url).await;
+println!("{data}");
+```
+
+## Parallelism and Concurrency
+When an individual works on several different tasks before any of them is complete, this is `concurrency`.
+You’re just one person, so you can’t make progress on both tasks at the exact
+same time, but you can multi-task, making progress on one at a time by switching
+between them.
+
+
+When the team splits up a group of tasks by having each member take one task and work on it alone, this is `parallelism`.
+Each person on the team can make progress at the exact same time.
+
+concurreny: multiple task one person
+parallelism: multiple person one task
+
+you might realize that one of your own tasks depends on another of your tasks. Now your concurrent work has also become serial.
+
+Parallelism and concurrency can intersect with each other.
+
+## 17.1 Futures and the Async Syntax
+key elements of asynchronous programming in Rust are futures and Rust’s async and await keywords.
+A future is a value that may not be ready now but will become ready at some point in the future.
+ex: Promise in js
+
+apply via `Future` trait.
+futures are types that implement the Future trait. Each future holds its own information about the progress that has been made and what “ready” means.
+
+apply the `async` keyword to blocks and functions to specify that they can be interrupted and resumed
+
+`await` keyword to await a future (that is, wait for it to become ready).
+
+process of checking with a future to see if its value is available yet is called `polling`.
+
+just like js, in rust we use `async` and `await`.
+Rust compiles them into equivalent code using the `Future` trait, much as it compiles `for` loops into equivalent code using the `Iterator` trait.
+
+let's understand by writing a project: a web scrapper; pass 2 url, fetch
+concurrently, return whichever 1st ends.
+
+use `future` crate for async programming.
+`Tokio` is the most widely used async runtime in Rust today.
+
+We use the `tokio` crate under the hood for `trpl` because it’s `well tested and widely used`.
+
+create a new project:
+```sh
+$ cargo new hello-async
+$ cd hello-async
+$ cargo add trpl
+```
+
+writing a function that takes one page URL as a parameter, makes a request to it, and returns the text of the title element
+
+When Rust sees a block marked with the async keyword, it compiles it into a unique, anonymous data type that implements the Future trait.
+When Rust sees a function marked with async, it compiles it into a non-async function whose body is an async block. An async function’s return type is the type of the anonymous data type the compiler creates for that async block.
+
+Every Rust program that executes async code has at least one place where it sets up a runtime and executes the futures.
+
+
+```rs
+async fn page_title(url: &str) -> Option<String> {
+    let response = trpl::get(url).await; //call the url ,hvae await method on
+    //it
+    let response_text = response.text().await; //get the text from the response
+    Html::parse(&response_text) //parse into HTML
+        .select_first("title") //find
+        //the first instance of a given CSS selector. here 'title'
+        .map(|title_element| title_element.inner_html())
+}
+
+```
+is similar to:
+```rs
+use std::future::Future;
+use trpl::Html;
+
+fn page_title(url: &str) -> impl Future<Output = Option<String>> + '_ {
+    //returned trait is future, Output type is Option<String>
+    async move {    //async move is a function type
+        let text = trpl::get(url).await.text().await;
+        Html::parse(&text)
+            .select_first("title")
+            .map(|title| title.inner_html())
+    }
+}
+```
+
+we can't use `async` keyword for main function; reason: async code needs a runtime: 
+a Rust crate that manages the details of executing asynchronous code. A program’s main function can initialize a runtime, but it’s not a runtime itself.
+
+we use the run function from the trpl crate, which takes a future as an argument and runs it to completion. Behind the scenes, calling run sets up a runtime that’s used to run the future passed in. Once the future completes, run returns whatever value the future produced.
+
+run like: `cargo run -- https://www.rust-lang.org`
+
+Each await point—that is, every place where the code uses the await keyword—represents a place where control is handed back to the runtime. To make that work, Rust needs to keep track of the state involved in the async block so that the runtime can kick off some other work and then come back when it’s ready to try advancing the first one again.
+```rs
+enum PageTitleFuture<'a> {
+    Initial { url: &'a str },
+    GetAwaitPoint { url: &'a str },
+    TextAwaitPoint { response: trpl::Response },
+}
+```
+Writing the code to transition between each state by hand would be tedious and error-prone,
+compiler handles this
+the Rust compiler creates and manages the state machine data structures for async code automatically.
+
+Ultimately, something has to execute this state machine, and that something is a runtime.
+
+that's why we can't keep the main function `async`.
+If `main` were an async function, something else would need to manage the state machine for whatever future `main` returned, but `main` is the `starting point` for the program! Instead, we called the `trpl::run` function in main to set up a `runtime` and run the future returned by the `async` block until it returns `Ready`.
+
+If `main` were an async function, something else would need to manage the state machine for whatever future `main` returned, but `main` is the `starting point` for the program! Instead, we called the `trpl::run` function in main to set up a `runtime` and run the future returned by the `async` block until it returns `Ready`.
+
+
+begin by calling page_title for each of the user-supplied URLs. We save the resulting futures as title_fut_1 and title_fut_2
+pass the futures to trpl::race, which returns a value to indicate which of the futures passed to it finishes first.
+Either future can legitimately “win,” so it doesn’t make sense to return a Result. Instead, race returns a type we haven’t seen before, trpl::Either. The Either type is somewhat similar to a Result in that it has two cases. Unlike Result, though, there is no notion of success or failure baked into Either. Instead, it uses Left and Right to indicate “one or the other”:
+```rs
+enum Either<A, B> {
+    Left(A),
+    Right(B),
+}
+
+```
+
+## 17.2 | Applying Concurrency with Async
+//macros are under chap 20, article 20.5
+//that's like last of the book
+
 # Macro
 basically to expand single line into multiple lines
 powerful feature that allows for metaprogramming by enabling the generation of code at compile-time
