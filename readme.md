@@ -3936,6 +3936,256 @@ enum Either<A, B> {
 ```
 
 ## 17.2 | Applying Concurrency with Async
+In this section we’ll focus on what’s different between threads and futures.
+In many cases, the APIs for working with concurrency using async are very similar to those for using threads. 
+In other cases, they end up being quite different.
+
+### Creating a New Task with `spawn_task`
+well trpl crate provides a `spawn_task` function that looks very similar to the `thread::spawn` API.
+a `sleep` function that is an `async version` of the `thread::sleep` API.
+ex:
+```rs
+use std::time::Duration;
+
+fn main() {
+    trpl::run(async {   //set up `main` function with `trpl::run` so that our top-level function can be `async`.
+        trpl::spawn_task(async {
+            for i in 1..10 {
+                println!("hi number {i} from the first task!");
+                trpl::sleep(Duration::from_millis(500)).await;  //waits for half a second (500 milliseconds) before sending the next message.
+            }
+        });
+
+        for i in 1..5 {
+            println!("hi number {i} from the second task!");
+            trpl::sleep(Duration::from_millis(500)).await;
+        }
+    });
+}
+```
+
+version stops as soon as the for loop in the body of the main async block finishes, because the task spawned by spawn_task is shut down when the main function ends.
+
+to run till the actual process ends: use a `join handle` to wait for the first task to complete.\
+With threads, we used the join method to “block” until the thread was done running.
+we can use await to do the same thing, because the task handle itself is a future. 
+Its Output type is a Result, so we also unwrap it after awaiting it.
+```rs
+        let handle = trpl::spawn_task(async {
+            for i in 1..10 {
+                println!("hi number {i} from the first task!");
+                trpl::sleep(Duration::from_millis(500)).await;
+            }
+        });
+
+        for i in 1..5 {
+            println!("hi number {i} from the second task!");
+            trpl::sleep(Duration::from_millis(500)).await;
+        }
+
+        handle.await.unwrap();
+```
+runs until both loops finish.
+
+looks like both `async` & `threads` are same.
+using `await` instead of calling `join` on the join handle, and awaiting the `sleep` calls.
+
+`bigger difference is that we didn’t need to spawn another operating system
+thread to do this`
+async blocks compile to anonymous futures, we can put each loop in an async block and have the runtime run them both to completion using the `trpl::join` function.
+
+
+ use the join method on the JoinHandle type
+returned when you call std::thread::spawn. The trpl::join function is similar,
+but for futures.
+ 
+so when we give it two futures, it produces another new futures whose o/p is
+tuple of each future you passed in{o/p is a tuple ; the tuple has both futures
+contained in it a/f they complete}.
+
+we use `trpl::join` to wait for both `fut1` and `fut2` to finish. We `don't
+await fut1 and fut2` but instead the `new future` produced by `trpl::join`.
+ex:
+```rs
+        let fut1 = async {
+            for i in 1..10 {
+                println!("hi number {i} from the first task!");
+                trpl::sleep(Duration::from_millis(500)).await;
+            }
+        };
+
+        let fut2 = async {
+            for i in 1..5 {
+                println!("hi number {i} from the second task!");
+                trpl::sleep(Duration::from_millis(500)).await;
+            }
+        };
+
+        trpl::join(fut1, fut2).await;
+```
+
+trpl::join function is fair, meaning it checks each future equally often, alternating between them, and never lets one race ahead if the other is ready.
+os decides which thread to check and how long to let it run.runtime decides which task to check.
+
+### Counting Up on Two Tasks Using Message Passing
+Sharing data between futures will be via use of message passing again, but this
+time with async versions of the types and functions.
+
+begin with just a single async block—not spawning a separate task as we spawned a separate thread.
+```rs
+        let (tx, mut rx) = trpl::channel();     //trpl::channel, an async version of the multiple-producer, single-consumer channel API;
+        //use a mutable receiver rx
+
+        let val = String::from("hi");
+        tx.send(val).unwrap();
+
+        let received = rx.recv().await.unwrap();    //recv method produces a future which needs to be await
+        println!("Got: {received}");
+```
+synchronous `Receiver::recv` method in `std::mpsc::channel` blocks until it receives a message.
+`trpl::Receiver::recv` method does not, because it is async.
+
+```rs
+        let (tx, mut rx) = trpl::channel();
+
+        let vals = vec![
+            String::from("hi"),
+            String::from("from"),
+            String::from("the"),
+            String::from("future"),
+        ];
+
+        for val in vals {
+            tx.send(val).unwrap();
+            trpl::sleep(Duration::from_millis(500)).await;
+        }
+
+        while let Some(value) = rx.recv().await {   //rx.recv produces a future
+            //which is awaited
+            println!("received '{value}'");
+        }
+```
+- message arrive right away
+- no concurrency
+- wait until we determine that no more message arrive
+
+problems:
+- msg don't arrive in a queue, they arrive all at once at 2 sec time.
+- program never exit, it just waits and waits, need to quit manually
+
+To get the sleep delay happens between each message, put the tx and rx operations in their own async blocks
+
+```rs
+        let tx_fut = async {
+            let vals = vec![
+                String::from("hi"),
+                String::from("from"),
+                String::from("the"),
+                String::from("future"),
+            ];
+
+            for val in vals {
+                tx.send(val).unwrap();
+                trpl::sleep(Duration::from_millis(500)).await;
+            }
+        };
+
+        let rx_fut = async {
+            while let Some(value) = rx.recv().await {
+                println!("received '{value}'");
+            }
+        };
+
+        trpl::join(tx_fut, rx_fut).await;
+```
+the message prints after interval of 500 milliseconds rather than all at once
+a/f 2 sec.
+
+The program still never exits, though, because of the way while let loop interacts with trpl::join:
+
+- The future returned from trpl::join completes only once both futures passed to it have completed.
+- The tx future completes once it finishes sleeping after sending the last message in vals.
+- The rx future won’t complete until the while let loop ends.
+- The while let loop won’t end until awaiting rx.recv produces None.
+- Awaiting rx.recv will return None only once the other end of the channel is closed.
+- The channel will close only if we call rx.close or when the sender side, tx, is dropped.
+- We don’t call rx.close anywhere, and tx won’t be dropped until the outermost async block passed to trpl::run ends.
+- The block can’t end because it is blocked on trpl::join completing, which takes us back to the top of this list.
+
+`move` keyword works with async blocks just as it does with closures.
+ex:
+```rs
+        let (tx, mut rx) = trpl::channel();
+
+        let tx_fut = async move {
+            let vals = vec![
+                String::from("hi"),
+                String::from("from"),
+                String::from("the"),
+                String::from("future"),
+            ];
+
+            for val in vals {
+                tx.send(val).unwrap();
+                trpl::sleep(Duration::from_millis(500)).await;
+            }
+        };
+
+        let rx_fut = async {
+            while let Some(value) = rx.recv().await {
+                println!("received '{value}'");
+            }
+        };
+
+        trpl::join(tx_fut, rx_fut).await;
+```
+
+This async channel is also a multiple-producer channel, so we can call clone on tx if we want to send messages from multiple futures
+```rs
+        let (tx, mut rx) = trpl::channel();
+
+        let tx1 = tx.clone();
+        let tx1_fut = async move {
+            let vals = vec![
+                String::from("hi"),
+                String::from("from"),
+                String::from("the"),
+                String::from("future"),
+            ];
+
+            for val in vals {
+                tx1.send(val).unwrap();
+                trpl::sleep(Duration::from_millis(500)).await;
+            }
+        };
+
+        let rx_fut = async {
+            while let Some(value) = rx.recv().await {
+                println!("received '{value}'");
+            }
+        };
+
+        let tx_fut = async move {
+            let vals = vec![
+                String::from("more"),
+                String::from("messages"),
+                String::from("for"),
+                String::from("you"),
+            ];
+
+            for val in vals {
+                tx.send(val).unwrap();
+                trpl::sleep(Duration::from_millis(1500)).await;
+            }
+        };
+
+        trpl::join3(tx1_fut, tx_fut, rx_fut).await;
+```
+move `async` file to `bin` folder and run that directly by:
+`cargo run --bin async`
+
+## 17.3 | Working with Any Number of Futures
+
 //macros are under chap 20, article 20.5
 //that's like last of the book
 
