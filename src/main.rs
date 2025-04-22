@@ -7,6 +7,7 @@ mod error;
 mod fib;
 mod for_temp;
 mod function;
+mod future;
 mod hash_map;
 mod hash_map2;
 mod hash_map3;

@@ -4185,6 +4185,349 @@ move `async` file to `bin` folder and run that directly by:
 `cargo run --bin async`
 
 ## 17.3 | Working with Any Number of Futures
+` trpl::join!(tx1_fut, tx_fut, rx_fut);`
+
+ Using join! to wait for multiple futures
+this macro form only works when we know the number of futures ahead of time
+
+ In real-world Rust, though, pushing futures into a collection and then waiting on some or all the futures of them to complete is a common pattern.
+
+to check for futures iterate and join all of them.
+`trpl::join_all` function accepts any type that implements the `Iterator trait`,
+```rs
+        let futures = vec![tx1_fut, rx_fut, tx_fut];
+
+        trpl::join_all(futures).await;
+```
+After all, none of the async blocks returns anything, so each one produces a `Future<Output = ()>`.
+even if you declare it `async` creates prpblem cause the `rust-lang` assignes
+each `asnyc` in new block
+Remember that `Future` is a trait, though, and that the compiler creates a `unique enum for each async block`.
+
+solution: use `trait objects`. lets us treat each of the anonymous futures produced by these types as the same type, because all of them implement the Future trait.
+
+ start by wrapping each future in the `vec!` in a `Box::new`
+```rs
+        let futures =
+            vec![Box::new(tx1_fut), Box::new(rx_fut), Box::new(tx_fut)];
+
+        trpl::join_all(futures).await;
+```
+
+```rs
+        let futures: Vec<Box<dyn Future<Output = ()>>> =        //output of the future is the unit type ();
+        //trait annotated dynamic by `dyn`; wrap whole trait in `box`
+        //state explicitly that futures is a Vec containing these items.
+
+            vec![Box::new(tx1_fut), Box::new(rx_fut), Box::new(tx_fut)];
+```
+
+gives vaious error upon compilation:
+- first async block (src/main.rs:8:23: 20:10) does not implement the Unpin trait and suggests using pin! or Box::pin to resolve it.
+- use Box::pin to pin the futures themselves.
+
+```rs
+        let futures: Vec<Pin<Box<dyn Future<Output = ()>>>> =
+            vec![Box::pin(tx1_fut), Box::pin(rx_fut), Box::pin(tx_fut)];
+```
+compiles man!!!
+
+- `Pin<Box<T>>` adds a small amount of overhead from putting these futures on the heap with Box—and we’re only doing that to get the types to line up.
+- don't need heap allocation cause Futures are local to only this scope
+- Pin is itself a wrapper type, so we can get the benefit of having a single type in the Vec—the original reason we reached for Box—without doing a heap allocation. 
+- We can use Pin directly with each future, using the std::pin::pin macro.
+- we must still be explicit about the type of the pinned reference; otherwise, Rust will still not know to interpret these as dynamic trait objects, which is what we need them to be in the Vec.
+- therefore `pin!` each `future` when we define it, and define futures as a Vec containing pinned mutable references to the dynamic future type
+```rs
+        let tx1_fut = pin!(async move {
+            // --snip--
+        });
+
+        let rx_fut = pin!(async {
+            // --snip--
+        });
+
+        let tx_fut = pin!(async move {
+            // --snip--
+        });
+
+        let futures: Vec<Pin<&mut dyn Future<Output = ()>>> =
+            vec![tx1_fut, rx_fut, tx_fut];
+
+                let a = async { 1u32 }; //anonymous future for a implements Future<Output = u32>
+        let b = async { "Hello!" }; //for b implements Future<Output = &str>
+        let c = async { true };     //for c implements Future<Output = bool>.
+
+        let (a_result, b_result, c_result) = trpl::join!(a, b, c);
+        println!("{a_result}, {b_result}, {c_result}");
+
+```
+use `trpl::join!` to await them, because it allows us to pass in multiple future types and produces a tuple of those types
+cannot use trpl::join_all, because it requires all of the futures passed in to
+have the same type.
+
+fundamental tradeoff: 
+- we can either deal with a dynamic number of futures with join_all, as long as they all have the same type, or 
+- we can deal with a set number of futures with the join functions or the join! macro, even if they have different types.
+
+### Racing Futures
+When we “join” futures with the join family of functions and macros, we require all of them to finish before we move on. use 2 futures: fast, slow
+```rs
+        let slow = async {
+            println!("'slow' started.");
+            trpl::sleep(Duration::from_millis(100)).await;
+            println!("'slow' finished.");
+        };
+
+        let fast = async {
+            println!("'fast' started.");
+            trpl::sleep(Duration::from_millis(50)).await;
+            println!("'fast' finished.");
+        };
+
+        trpl::race(slow, fast).await;
+
+```
+
+print msg at each function
+pass `slow` and `fast` to `trpl::sleep` and check who exceutes/finishes fast.
+Rust only pauses async blocks and hands control back to a runtime at an await point. Everything between await points is synchronous.
+
+### Yielding Control to the Runtime
+example of long-running function:
+```rs
+fn slow(name: &str, ms: u64) {
+    thread::sleep(Duration::from_millis(ms));   //uses thread::sleep so blocks
+    //the current thread for some time period
+    println!("'{name}' ran for {ms}ms");
+}
+```
+uses std::thread::sleep instead of trpl::sleep so that calling slow will block the current thread for some number of milliseconds.
+```rs
+        let a = async {
+            println!("'a' started.");
+            slow("a", 30);
+            slow("a", 10);
+            slow("a", 20);
+            trpl::sleep(Duration::from_millis(50)).await;
+            println!("'a' finished.");
+        };
+
+        let b = async {
+            println!("'b' started.");
+            slow("b", 75);
+            slow("b", 10);
+            slow("b", 15);
+            slow("b", 350);
+            trpl::sleep(Duration::from_millis(50)).await;
+            println!("'b' finished.");
+        };
+
+        trpl::race(a, b).await;
+```
+o/p:
+```bin
+'a' started.
+'a' ran for 30ms
+'a' ran for 10ms
+'a' ran for 20ms
+'b' started.
+'b' ran for 75ms
+'b' ran for 10ms
+'b' ran for 15ms
+'b' ran for 350ms
+'a' finished.
+```
+race still finishes as soon as a is done
+- `a` future does all of its work until the `trpl::sleep` call is awaited
+- `b` future does all of its work until its own `trpl::sleep` call is awaited
+-  `a` future complete
+
+if we removed the trpl::sleep at the end of the a future, it would complete without the b future running at all.
+```rs
+        let one_ms = Duration::from_millis(1);
+
+        let a = async {
+            println!("'a' started.");
+            slow("a", 30);
+            trpl::sleep(one_ms).await;
+            slow("a", 10);
+            trpl::sleep(one_ms).await;
+            slow("a", 20);
+            trpl::sleep(one_ms).await;
+            println!("'a' finished.");
+        };
+
+        let b = async {
+            println!("'b' started.");
+            slow("b", 75);
+            trpl::sleep(one_ms).await;
+            slow("b", 10);
+            trpl::sleep(one_ms).await;
+            slow("b", 15);
+            trpl::sleep(one_ms).await;
+            slow("b", 35);
+            trpl::sleep(one_ms).await;
+            println!("'b' finished.");
+        };
+```
+o/p:
+```bin
+'a' started.
+'a' ran for 30ms
+'b' started.
+'b' ran for 75ms
+'a' ran for 10ms
+'b' ran for 10ms
+'a' ran for 20ms
+'b' ran for 15ms
+'a' finished.
+```
+`a` runs for a bit b/f `b` cause if calles `slow` b/f `trpl::sleep`. in this
+shit a `await` point get hit which just makes it wait for indefinitely long.
+
+we really don't want to sleep; just hand back and forth the control using
+`yield_now` function.
+replace all those `sleep` calls with `yield_now`.
+```rs
+        let a = async {
+            println!("'a' started.");
+            slow("a", 30);
+            trpl::yield_now().await;
+            slow("a", 10);
+            trpl::yield_now().await;
+            slow("a", 20);
+            trpl::yield_now().await;
+            println!("'a' finished.");
+        };
+
+        let b = async {
+            println!("'b' started.");
+            slow("b", 75);
+            trpl::yield_now().await;
+            slow("b", 10);
+            trpl::yield_now().await;
+            slow("b", 15);
+            trpl::yield_now().await;
+            slow("b", 35);
+            trpl::yield_now().await;
+            println!("'b' finished.");
+        };
+```
+
+will always sleep for at least a millisecond, even if we pass it a Duration of one nanosecond. 
+ex:
+```rs
+fn main(){
+        let one_ns = Duration::from_nanos(1);
+        let start = Instant::now();
+        async {
+            for _ in 1..1000 {
+                trpl::sleep(one_ns).await;  //pass a one-nanosecond Duration to trpl::sleep
+            }
+        }
+        .await;
+        let time = Instant::now() - start;
+        println!(
+            "'sleep' version finished after {} seconds.",
+            time.as_secs_f32()
+        );
+
+        let start = Instant::now();
+        async {
+            for _ in 1..1000 {
+                trpl::yield_now().await;    //yield_now is way faster
+            }
+        }
+        .await;
+        let time = Instant::now() - start;
+        println!(
+            "'yield' version finished after {} seconds.",
+            time.as_secs_f32()
+        );
+
+}
+```
+This means that async can be useful even for compute-bound tasks, depending on what else your program is doing, because it provides a useful tool for structuring the relationships between different parts of the program. 
+This is a form of cooperative multitasking, where each future has the power to determine when it hands over control via await points. Each future therefore also has the responsibility to avoid blocking for too long. 
+In some Rust-based embedded operating systems, this is the only kind of multitasking!
+
+### Building Our Own Async Abstractions
+We can also compose futures together to create new patterns.ex:
+timeout to work with a slow future.
+```rs
+        let slow = async {
+            trpl::sleep(Duration::from_millis(100)).await;
+            "I finished!"
+        };
+
+        match timeout(slow, Duration::from_millis(10)).await {
+            Ok(message) => println!("Succeeded with '{message}'"),
+            Err(duration) => {
+                println!("Failed after {} seconds", duration.as_secs())
+            }
+        }
+```
+
+We can also compose futures together to create new patterns.
+
+build a api for timeout:
+- It needs to be an async function itself so we can await it.
+- Its first parameter should be a future to run. We can make it generic to allow it to work with any future.
+- Its second parameter will be the maximum time to wait. If we use a Duration, that will make it easy to pass along to trpl::sleep.
+- It should return a Result. If the future completes successfully, the Result will be Ok with the value produced by the future. If the timeout elapses first, the Result will be Err with the duration that the timeout waited for.
+```rs
+async fn timeout<F: Future>(
+    future_to_try: F,
+    max_time: Duration,
+) -> Result<F::Output, Duration> {
+    // Here is where our implementation will go!
+}
+```
+race the future passed in against the duration.
+- use trpl::sleep to make a timer future from the duration, and 
+- use trpl::race to run that timer with the future the caller passes in.
+-  pass future_to_try to race first so it gets a chance to complete even if max_time is a very short duration
+- If future_to_try finishes first, race will return Left with the output from future_to_try. 
+- If timer finishes first, race will return Right with the timer’s output of ().
+ex:
+```rs
+use trpl::Either;
+
+// --snip--
+
+fn main() {
+    trpl::run(async {
+        let slow = async {
+            trpl::sleep(Duration::from_secs(5)).await;
+            "Finally finished"
+        };
+
+        match timeout(slow, Duration::from_secs(2)).await {
+            Ok(message) => println!("Succeeded with '{message}'"),
+            Err(duration) => {
+                println!("Failed after {} seconds", duration.as_secs())
+            }
+        }
+    });
+}
+
+async fn timeout<F: Future>(
+    future_to_try: F,
+    max_time: Duration,
+) -> Result<F::Output, Duration> {
+    match trpl::race(future_to_try, trpl::sleep(max_time)).await {
+        Either::Left(output) => Ok(output),
+        Either::Right(_) => Err(max_time),
+    }
+```
+
+o/p:
+```bin
+Failed after 2 seconds
+```
+
+## 17.4 | Streams: Futures in Sequence
 
 //macros are under chap 20, article 20.5
 //that's like last of the book
