@@ -4527,7 +4527,182 @@ o/p:
 Failed after 2 seconds
 ```
 
-## 17.4 | Streams: Futures in Sequence
+## 17.4 | Streams: Futures in Sequences
+ The async recv method produces a sequence of items over time. This is an instance of a much more general pattern known as a stream.
+
+there are two differences between iterators and the async channel receiver:
+1. time: iterators are synchronous, while the channel receiver is asynchronous. 
+2. API: iterator has synchronous `next` method, but the `trpl::Stream` have
+   Asynchronous method `recv`; otherwise they are similar
+similarity suggest that we can create a stream from any iterator.
+
+```rs
+        let values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let iter = values.iter().map(|n| n * 2);    //convert to iterator; double all values
+        let mut stream = trpl::stream_from_iter(iter);  //convert the iterator into a stream
+
+        while let Some(value) = stream.next().await {   //loop over the items in the stream as they arrive
+            println!("The value was: {value}");
+        }
+
+```
+reason for the compiler error is that we need the right trait in scope to be able to use the next method. 
+use trait `StreamExt`. {Ext is a common pattern in the Rust community for extending one trait with another.}
+- Stream trait defines a low-level interface that effectively combines the Iterator and Future traits.
+- StreamExt supplies a higher-level set of APIs on top of Stream, including the next method
+
+fix to the compiler error is to add a use statement for trpl::StreamExt.
+```rs
+use trpl::StreamExt;
+
+fn main() {
+    trpl::run(async {
+        let values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let iter = values.iter().map(|n| n * 2);
+        let mut stream = trpl::stream_from_iter(iter);
+
+        while let Some(value) = stream.next().await {
+            println!("The value was: {value}");
+        }
+    });
+}
+```
+
+### Composing Streams
+some example of stream are:
+- items becoming available in a queue, 
+- chunks of data being pulled incrementally from the filesystem when the full data set is too large for the computer’s , or 
+- data arriving over the network over time.
+
+they can be used with any type of fututres and combined with them.
+
+building a little stream of messages as a stand-in for a stream of data we might see from a WebSocket or another real-time communication protocol
+`socket.rs`
+create a function called get_messages that returns impl Stream<Item = String>, create an async channel, loop over the first 10 letters of the English alphabet, and send them across the channel.
+used a new type: ReceiverStream, which converts the rx receiver from the trpl::channel into a Stream with a next method.
+
+let’s add a feature that requires streams: adding a timeout that applies to every item in the stream, and a delay on the items we emit,
+add a timeout to stream method via timeout method, which comes from the StreamExt trait.
+update while let cause now it returns some value of type `Result<Ok,Err>`
+`Ok`-> msg arrived in time.
+`Err`-> timeout elapsed before any message arrived.
+
+pin the messages after applying the timeout to them, because the timeout helper produces a stream that needs to be pinned to be polled.
+wrap the function content under `async move`.
+
+- In get_messages, we use the enumerate iterator method with the messages array so that we can get the index of each item we’re sending along with the item itself. 
+- apply a 100-millisecond delay to even-index items and a 300-millisecond delay to odd-index items to simulate the different delays we might see from a stream of messages in the real world. Because our timeout is for 200 milliseconds, this should affect half of the messages.
+
+use async in order to delay b/w messgae w/o blocking. but can't make them into
+aysnc function cause return will be changed to `Future<Output = Stream<Item = String>>` instead of a `Stream<Item = String>>`.
+
+Awaiting get_messages would require it to send all the messages, including the sleep delay between each message, before returning the receiver stream.
+
+Instead, we leave get_messages as a regular function that returns a stream, and we spawn a task to handle the async sleep calls.
+
+timeout doesn’t prevent the messages from arriving in the end b/c channel is
+`unbounded`
+
+### Merging Streams
+create another stream which o/p every milliseconds
+use the sleep function to send a message on a delay and combine it with the same approach we used in get_messages of creating a stream from a channel. 
+
+this time, we’re going to send back the count of intervals that have elapsed, so the return type will be `impl Stream<Item = u32>`
+```rs
+fn get_intervals() -> impl Stream<Item = u32> {
+    let (tx, rx) = trpl::channel();
+
+    trpl::spawn_task(async move {
+        let mut count = 0;  //define a count
+        loop {
+            trpl::sleep(Duration::from_millis(1)).await;    //asynchronously sleeps for one millisecond
+            count += 1; //inifintely increase the count
+            tx.send(count).unwrap();    //send over channel
+        }
+    });
+
+    ReceiverStream::new(rx)
+}
+```
+now we can merge the function:
+```rs
+        let messages = get_messages().timeout(Duration::from_millis(200));
+        let intervals = get_intervals();    //call the method
+        let merged = messages.merge(intervals); //merge both messages and
+        //intervals
+```
+neither messages nor intervals needs to be pinned or mutable, because both will be combined into the single merged stream.
+but doesn't compiles cause both stream have diff types
+`messages` -> `Timeout<impl Stream<Item = String>>`; `Timeout` -> Stream for a timeout call.; `intervals` -> `impl Stream<Item = u32>`.
+```rs
+        let messages = get_messages().timeout(Duration::from_millis(200));
+        let intervals = get_intervals()
+            .map(|count| format!("Interval: {count}"))  //to transform the intervals into a string.match the Timeout from messages.
+            .timeout(Duration::from_secs(10));  //create a 10-second timeout 
+        let merged = messages.merge(intervals);
+        let mut stream = pin!(merged);  //so that the while let loop’s next calls can iterate
+
+```
+
+two problems-> 
+1. it will never stop! You’ll need to stop it with ctrl-c.
+2. the messages from the English alphabet will be buried in the midst of all the interval counter.
+
+solution->
+1. use the throttle method on the intervals stream so that it doesn’t overwhelm the messages stream
+    Throttling is a way of limiting the rate at which a function will be called—or, in this case, how often the stream will be polled.
+    do in like 100 ms.
+
+    throttle call produces a new stream that wraps the original stream so that the original stream gets polled only at the throttle rate, not its own “native” rate.
+
+to handle errors:
+- send calls could fail when the other side of the channel closes.{ignored this possibility by calling unwrap}
+- explicitly handle the error, at minimum by ending the loop so we don’t try to
+send any more messages.
+
+```rs
+fn get_messages() -> impl Stream<Item = String> {
+    let (tx, rx) = trpl::channel();
+
+    trpl::spawn_task(async move {
+        let messages = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
+
+        for (index, message) in messages.into_iter().enumerate() {
+            let time_to_sleep = if index % 2 == 0 { 100 } else { 300 };
+            trpl::sleep(Duration::from_millis(time_to_sleep)).await;
+
+            if let Err(send_error) = tx.send(format!("Message: '{message}'")) {
+                eprintln!("Cannot send message '{message}': {send_error}");
+                break;
+            }
+        }
+    });
+
+    ReceiverStream::new(rx)
+}
+
+fn get_intervals() -> impl Stream<Item = u32> {
+    let (tx, rx) = trpl::channel();
+
+    trpl::spawn_task(async move {
+        let mut count = 0;
+        loop {
+            trpl::sleep(Duration::from_millis(1)).await;
+            count += 1;
+
+            if let Err(send_error) = tx.send(count) {
+                eprintln!("Could not send interval {count}: {send_error}");
+                break;
+            };
+        }
+    });
+
+    ReceiverStream::new(rx)
+}
+```
+
+To limit the number of items we will accept from a stream, we apply the take method to the merged stream, because we want to limit the final output, not just one stream or the other.
+
 
 //macros are under chap 20, article 20.5
 //that's like last of the book

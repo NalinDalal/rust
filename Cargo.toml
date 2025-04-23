@@ -13,6 +13,11 @@ serde = {version = "1.0.218", features = ["derive"]}
 quote = "1.0.40"
 syn = { version = "2.0", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
+trpl = "0.2.0"
+futures-core = "0.3.31"
+tokio-stream = "0.1.17"
+futures = "0.3.31"
 [lib]
 proc-macro = true
+futures = "0.3"
 

@@ -73,9 +73,9 @@ async fn main() {
     println!("All pinned dynamic futures finished!\n");
 
     println!("=== Racing async blocks ===");
-    let slow = async {
+    let slow_task = async {
         println!("'slow' started.");
-        trpl::time::sleep(Duration::from_millis(100)).await;
+        slow("slow", 100); // Call the blocking slow function here
         println!("'slow' finished.");
     };
 
@@ -85,7 +85,7 @@ async fn main() {
         println!("'fast' finished.");
     };
 
-    futures::future::select(Box::pin(slow), Box::pin(fast)).await;
+    futures::future::select(Box::pin(slow_task), Box::pin(fast)).await;
     println!("Race done!\n");
 
     println!("=== Yielding control ===");

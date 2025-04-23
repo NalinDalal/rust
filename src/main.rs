@@ -28,6 +28,8 @@ mod option_enum;
 mod packages;
 mod pattern;
 mod reference;
+mod socket;
+mod stream;
 mod structs;
 mod thread;
 mod trait1;
