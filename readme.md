@@ -4802,6 +4802,64 @@ in safe code, compiler prevents you from moving any item with an active referenc
 When we pin a value by wrapping a pointer to that value in Pin, it can no longer move. 
 Thus, if you have `Pin<Box<SomeType>>`, you actually pin the `SomeType` value, not the Box pointer.
 
+the Box pointer can still move around freely. If a pointer moves around, but the data it points to is in the same place, there’s no problem.
+
+However, most types are perfectly safe to move around, even if they happen to be behind a Pin pointer. 
+We only need to `think` about pinning `when items have internal references`.
+
+but consider this: `Pin<Vec<String>>`, you’d have to do everything via the safe but restrictive APIs provided by Pin, even though a `Vec<String>` is always safe to move if there are no other references to it. 
+We need a way to tell the compiler that it’s fine to move items around in cases like this—and there’s where `Unpin` comes into play.
+
+`Unpin` is a `marker trait`, similar to the Send and Sync traits, and has no functionality of its own.
+- informs the compiler that a given type does not need to uphold any guarantees about whether the value in question can be safely moved.
+- tell the compiler it’s safe to use the type implementing a given trait in a particular context.
+
+hence `Unpin` is implemented automatically just call it like: `impl !Unpin for SomeType` {SomeType is the type to be implemented on}.
+1. `Unpin` is the “normal” case, and `!Unpin` is the special case
+2. whether a type implements `Unpin` or `!Unpin` only matters when you’re using a `pinned pointer to that type like Pin<&mut SomeType>`.
+
+consider a String, we can wrap up a String in pin, but unpin needs not be created, automatically called.
+- we can do things that would be illegal if String implemented !Unpin instead,  such as replacing one string with another at the exact same location in memory.
+- doesn’t violate the Pin contract, because String has no internal references that make it unsafe to move around! That is precisely why it implements Unpin rather than !Unpin.
+
+
+### The `Stream` Trait
+streams are similar to asynchronous iterators. Stream has no definition in the standard library as of this writing, but 
+there is a very common definition from the futures crate used throughout the ecosystem.
+
+From Iterator, we have the idea of a sequence: its next method provides an `Option<Self::Item>`. 
+From Future, we have the idea of readiness over time: its poll method provides a `Poll<Self::Output>`.
+```rs
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+trait Stream {
+    type Item;
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>
+    ) -> Poll<Option<Self::Item>>;
+}
+```
+Stream trait defines an associated type called Item for the type of the items produced by the stream
+`poll_next` method to call the values, produces a sequence of items in the same way Iterator::next does. 
+Its return type combines `Poll` with `Option`. 
+- The outer type is Poll, because it has to be checked for readiness, just as a future does. 
+- The inner type is Option, because it needs to signal whether there are more messages, just as an iterator does.
+
+can also use `next` and `StreamExt`; StreamExt trait supplies the next method so we can do just that:
+```rs
+trait StreamExt: Stream {
+    async fn next(&mut self) -> Option<Self::Item>
+    where
+        Self: Unpin;
+
+    // other methods...
+}
+```
+
+
 //macros are under chap 20, article 20.5
 //that's like last of the book
 
