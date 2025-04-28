@@ -4703,6 +4703,104 @@ fn get_intervals() -> impl Stream<Item = u32> {
 
 To limit the number of items we will accept from a stream, we apply the take method to the merged stream, because we want to limit the final output, not just one stream or the other.
 
+## 17.5 | A Closer Look at the Traits for Async
+we read about `Futures`, `pin` and various traits, but don't know how to use,
+where to use
+let's dive into these scenarios
+
+### The `Future` Trait
+```rs
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+pub trait Future {
+    type Output;    //says what the future resolves to
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
+}
+```
+
+the poll method returns:
+```rs
+enum Poll<T> {  //type is similar to an Option
+    Ready(T),   //future has finished its work and the T value is available.
+    Pending,    //indicates that the future still has work to do, so the caller will need to check again later.
+}
+```
+`await` functions are also called under the `Poll enum` under the hood, that's like `await` points to `Poll` enum.
+
+```rs
+match page_title(url).poll() {
+    Ready(page_title) => match page_title {
+        Some(title) => println!("The title for {url} was {title}"),
+        None => println!("{url} had no title"),
+    }
+    Pending => {
+        // But what goes here?
+        //need some way to try again, and again, and again, until the future is finally ready.
+        //need a loop here
+    }
+}
+```
+Rust makes sure that the loop can hand off control to something that can pause work on this future to work on other futures and then check this one again later.
+
+recv waits for future.
+The recv call returns a future, and awaiting the future polls it.
+it gives you a future — a special object that represents a value that will be available later.
+consider it similar to a promise in js
+recv are often wrapped in futures to facilitate non-blocking I/O operations. When you .await a future in asynchronous Rust, it polls the future to check if the operation is complete or needs to be scheduled for later, which is relevant to how recv is used in such environments.
+
+runtime puses the future, until we get something in return{`Some(message)`} or maybe `None` when channel closes.
+
+when return type is `Poll::Pending`-> future is pending
+return type of `Poll` is `Poll::Ready(Some(message))` or `Poll::Ready(None)`->
+future is ready.
+
+`a runtime polls each future it is responsible for, putting the future back to sleep when it is not yet ready.`
+
+- `recv()` → returns a future (a "not yet" value).
+
+- `await recv()` → tells the runtime to keep checking (polling) until that value is ready.
+
+
+### The `Pin` and `Unpin` Traits
+pinning is required for `boxes` if they wanna implement and `futures`.
+Directly awaiting a future with await pins the future implicitly. That’s why we don’t need to use pin! everywhere we want to await futures.
+
+join_all requires that the types of the items in the collection all implement the Future trait, and 
+Box<T> implements Future only if the T it wraps is a future that implements the Unpin trait.
+
+```rs
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+pub trait Future {
+    type Output;
+
+    // Required method
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
+}
+```
+The cx parameter and its Context type are the key to how a runtime actually knows when to check any given future while still being lazy.
+A type annotation for `self` is works like type annotations for other function parameters, but with two key differences:
+- It tells Rust what type self must be for the method to be called.
+- It can’t be just any type. It’s restricted to the type on which the method is implemented, a reference or smart pointer to that type, or a Pin wrapping a reference to that type.
+
+`Pin` is a wrapper for pointer-like types such as `&`, `&mut`, `Box`, and `Rc`.
+- Pin is not a pointer itself and doesn’t have any behavior of its own like Rc and Arc do with reference counting; 
+- it’s purely a tool the compiler can use to enforce constraints on pointer usage.
+
+Rust looks at what data is needed between one await point and either the next await point or the end of the async block
+rust works for blocks like scope, so yeah remember the heap collects over
+blocks, like that.
+
+When we move a future—whether by pushing it into a data structure to use as an iterator with join_all or by returning it from a function—that actually means moving the state machine Rust creates for us.
+
+any object that has a reference to itself is unsafe to move, because references always point to the actual memory address of whatever they refer to.
+
+in safe code, compiler prevents you from moving any item with an active reference to it. use `pin` for this guarantee.
+When we pin a value by wrapping a pointer to that value in Pin, it can no longer move. 
+Thus, if you have `Pin<Box<SomeType>>`, you actually pin the `SomeType` value, not the Box pointer.
 
 //macros are under chap 20, article 20.5
 //that's like last of the book
