@@ -4921,6 +4921,72 @@ fn main() {
 - Use **async** for IO-bound, highly concurrent tasks.
 - Combine both when necessary, leveraging each where it excels.
 
+# Chap 18
+# Object-Oriented Programming Features of Rust
+Rust is a language that supports both OOPs and POPs.
+
+## Objects Contain Data and Behavior
+Object-oriented programs are made up of objects. An object packages both data and the procedures that operate on that data. The procedures are typically called methods or operations.
+
+Rust is object-oriented: 
+- structs and enums have data, and 
+- impl blocks provide methods on structs and enums. 
+
+Even though structs and enums with methods aren’t called objects, they provide the same functionality, according to the Gang of Four’s definition of objects.
+
+## Encapsulation that Hides Implementation Details
+Encapsulation, which means that the implementation details of an object aren’t accessible to code using that object.
+Hence interaction is possible only via `publicAPI`.
+code using the object shouldn’t be able to reach into the object’s internals and
+change data or behavior directly.
+consider this:
+```rs
+pub struct AveragedCollection { //`pub` keyword suggest that the struct can be
+    //used by anyone
+    list: Vec<i32>, //but the data inside the struct is private
+    average: f64,
+//private so there is no way for external code to add or remove items to or from the list field directly
+}
+```
+
+implement add, remove, and average methods on the struct
+```rs
+impl AveragedCollection {
+    pub fn add(&mut self, value: i32) { //item is added to list
+        self.list.push(value);
+        self.update_average();
+    }
+
+    pub fn remove(&mut self) -> Option<i32> {   //item is removed
+        let result = self.list.pop();
+        match result {
+            Some(value) => {
+                self.update_average();
+                Some(value)
+            }
+            None => None,
+        }
+    }
+
+    pub fn average(&self) -> f64 {
+        self.average
+    }
+
+    fn update_average(&mut self) {
+        let total: i32 = self.list.iter().sum();
+        self.average = total as f64 / self.list.len() as f64;
+    }
+}
+```
+As long as the signatures of the add, remove, and average public methods stay the same, code using AveragedCollection wouldn’t need to change in order to compile
+`HashSet<i32>` and `Vec<i32>` have different methods for adding and removing items, so the external code would likely have to change if it were modifying list directly.
+
+### Inheritance as a Type System and as Code Sharing
+Inheritance is a mechanism whereby an object can inherit elements from another object’s definition, thus gaining the parent object’s data and behavior without you having to define them again.
+
+There is no way to define a struct that inherits the parent struct’s fields and method implementations without using a macro.
+
+
 
 //macros are under chap 20, article 20.5
 //that's like last of the book
