@@ -4860,6 +4860,68 @@ trait StreamExt: Stream {
 ```
 
 
+## 17.6 | Putting It All Together: Futures, Tasks, and Threads
+
+Threads and async are two different but complementary models of concurrency. Threads have been around longer and are supported by most operating systems, but they come with overhead and aren’t always suitable, especially for systems without an OS. Async tasks, on the other hand, are managed by the runtime rather than the OS and allow for more lightweight concurrency.
+
+You can replace async code with threads in many cases, as shown in Listing 17-41, without changing the behavior of the program:
+
+```rust
+Filename: src/main.rs
+fn get_intervals() -> impl Stream<Item = u32> {
+    let (tx, rx) = trpl::channel();
+
+    // This is *not* `trpl::spawn` but `std::thread::spawn`!
+    thread::spawn(move || {
+        let mut count = 0;
+        loop {
+            // Likewise, this is *not* `trpl::sleep` but `std::thread::sleep`!
+            thread::sleep(Duration::from_millis(1));
+            count += 1;
+
+            if let Err(send_error) = tx.send(count) {
+                eprintln!("Could not send interval {count}: {send_error}");
+                break;
+            };
+        }
+    });
+
+    ReceiverStream::new(rx)
+}
+```
+
+Async tasks are generally more memory-efficient and easier to compose than threads. Futures, which power async, can be paused and resumed, unlike threads which are "fire and forget." However, threads are sometimes simpler for parallel, compute-heavy workloads.
+
+You don’t have to choose one over the other—using both together can be powerful. Async runtimes often leverage multiple threads under the hood. For example, you can spawn a thread to do blocking work and use async to receive results:
+
+```rust
+Filename: src/main.rs
+use std::{thread, time::Duration};
+
+fn main() {
+    let (tx, mut rx) = trpl::channel();
+
+    thread::spawn(move || {
+        for i in 1..11 {
+            tx.send(i).unwrap();
+            thread::sleep(Duration::from_secs(1));
+        }
+    });
+
+    trpl::run(async {
+        while let Some(message) = rx.recv().await {
+            println!("{message}");
+        }
+    });
+}
+```
+
+**Guidelines for choosing:**
+- Use **threads** for parallel, compute-bound tasks.
+- Use **async** for IO-bound, highly concurrent tasks.
+- Combine both when necessary, leveraging each where it excels.
+
+
 //macros are under chap 20, article 20.5
 //that's like last of the book
 
@@ -4977,13 +5039,6 @@ functions for it.-> macro3.rs
 Copy and Clone are 2 traits
 Copy-> Just copy the value
 Clone-> pass the ownership, expensive
-
-
----------------------------------------------
-remaining:
-Macros
-8. Futures
-9. Async/await and tokio
 
 ---------------------------------------
 # Project Idea
