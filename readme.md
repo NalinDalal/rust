@@ -4925,6 +4925,7 @@ fn main() {
 # Object-Oriented Programming Features of Rust
 Rust is a language that supports both OOPs and POPs.
 
+## 18.1 | Characteristics of Object-Oriented Languages
 ## Objects Contain Data and Behavior
 Object-oriented programs are made up of objects. An object packages both data and the procedures that operate on that data. The procedures are typically called methods or operations.
 
@@ -4986,6 +4987,138 @@ Inheritance is a mechanism whereby an object can inherit elements from another o
 
 There is no way to define a struct that inherits the parent struct’s fields and method implementations without using a macro.
 
+but some tools are there:
+- implement particular behavior for one type, and inheritance enables to reuse that implementation for a different type.
+- Any type implementing the Summary trait would have the summarize method available on it without any further code.
+
+We can also override the default implementation of the summarize method when we implement the Summary trait, which is similar to a child class overriding the implementation of a method inherited from a parent class.
+
+inheritance relates to the type system: to enable a child type to be used in the same places as the parent type. This is also called `polymorphism`, which means that you can substitute multiple objects for each other at runtime if they share certain characteristics.
+
+Let’s look at how trait objects enable polymorphism in Rust.
+
+## 18.2 | Using Trait Objects That Allow for Values of Different Types
+we can store different types of data in each cell and still have a vector that represented a row of cells. This is a perfectly good solution when our interchangeable items are a fixed set of types that we know when our code is compiled.
+sometimes we want our library user to be able to extend the set of types that
+are valid in a particular situation.
+consider an example where we create an gui to draw stuff.
+now many things would have some common behavious like square and rectangle
+having 4 sides, stc.
+
+### Defining a Trait for Common Behavior
+define a trait named `Draw` that will have one method named `draw`. define a vector that takes a trait object. 
+
+`trait object` points to both an instance of a type implementing our specified trait and a table used to look up trait methods on that type at runtime.
+create a trait object by specifying some sort of pointer, such as a & reference or a `Box<T>` smart pointer, then the `dyn` keyword, and then specifying the relevant trait.
+
+**Wherever we use a trait object, Rust’s type system will ensure at compile time
+that any value used in that context will implement the trait object’s trait.**
+
+In a struct or enum, the data in the struct fields and the behavior in impl
+blocks are separated.
+
+trait objects are more like objects in other languages in the sense that they combine data and behavior. But trait objects differ from traditional objects in that we can’t add data to a trait object. 
+
+Trait objects aren’t as generally useful as objects in other languages: their
+specific purpose is to allow abstraction across common behavior.ex:
+```rs
+pub trait Draw {
+    fn draw(&self);
+}
+```
+
+struct named Screen that holds a vector named components.
+This vector is of type Box<dyn Draw>, which is a trait object; it’s a stand-in for any type inside a Box that implements the Draw trait.
+```rs
+pub struct Screen {
+    pub components: Vec<Box<dyn Draw>>,
+}
+```
+On the Screen struct, we’ll define a method named run that will call the draw method on each of its components:
+```rs
+impl Screen {
+    pub fn run(&self) {
+        for component in self.components.iter() {
+            component.draw();
+        }
+    }
+}
+```
+works differently from defining a struct that uses a generic type parameter with trait bounds.
+
+`generic type`-> substituted with one concrete type at a time
+`trait obj`-> multiple concrete types to fill in for the trait object at runtime.
+ex:
+```rs
+pub struct Screen<T: Draw> {
+    pub components: Vec<T>,
+}
+
+impl<T> Screen<T>
+where
+    T: Draw,
+{
+    pub fn run(&self) {
+        for component in self.components.iter() {
+            component.draw();
+        }
+    }
+}
+```
+
+**`homogeneous collections`**-> generics and trait bounds is preferable because the definitions will be monomorphized at compile time to use the concrete types.
+**`method using trait objects`**-> instance can hold a Vec<T> that contains a Box<Button> as well as a Box<TextField>
+
+### Implementation
+add some types that implement the Draw trait. 
+note: GUI is out of scope for book
+ex:
+```rs
+pub struct Button {
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl Draw for Button {
+    fn draw(&self) {
+        // code to actually draw a button
+    }
+}
+```
+
+someone using our library decides to implement a SelectBox struct that has width, height, and options fields, they implement the Draw trait on the SelectBox type as well,
+```rs
+use gui::Draw;
+
+struct SelectBox {
+    width: u32,
+    height: u32,
+    options: Vec<String>,
+}
+
+impl Draw for SelectBox {
+    fn draw(&self) {
+        // code to actually draw a select box
+    }
+}
+```
+user can now write their main function to create a Screen instance.
+- can add a SelectBox and a Button by putting each in a Box<T> to become a trait object.
+- can call the run method on the Screen instance, which will call draw on each of the components
+
+When we wrote the library, we didn’t know that someone might add the SelectBox type, but our Screen implementation was able to operate on the new type and draw it because SelectBox implements the Draw trait, which means it implements the draw method.
+
+1. `Trait Objects Enable Polymorphism`: Rust allows treating different types uniformly using trait objects (e.g., Box<dyn Draw>), similar to duck typing—code only cares that values implement required methods like draw, not their specific types.
+
+2. `Compile-Time Safety Over Runtime Errors`: Unlike duck typing in dynamic languages, Rust enforces trait implementation at compile time, preventing runtime errors due to missing methods and ensuring type safety.
+
+### Trait Objects Perform Dynamic Dispatch
+1. **Static vs Dynamic Dispatch:** Rust uses *static dispatch* with generics through monomorphization, generating concrete code at compile time, which improves performance and enables inlining.
+
+2. **Trait Objects Use Dynamic Dispatch:** When using trait objects, Rust employs *dynamic dispatch*, resolving method calls at runtime using vtables, which introduces a slight performance cost and limits some optimizations.
+
+3. **Flexibility vs Performance Trade-off:** While dynamic dispatch via trait objects offers greater flexibility (e.g., heterogeneous collections), it sacrifices some compile-time performance benefits and is constrained by Rust’s `dyn` compatibility rules.
 
 
 //macros are under chap 20, article 20.5
