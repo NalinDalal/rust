@@ -5121,6 +5121,33 @@ When we wrote the library, we didn’t know that someone might add the SelectBox
 3. **Flexibility vs Performance Trade-off:** While dynamic dispatch via trait objects offers greater flexibility (e.g., heterogeneous collections), it sacrifices some compile-time performance benefits and is constrained by Rust’s `dyn` compatibility rules.
 
 
+## 18.3 | Implementing an Object-Oriented Design Pattern
+The state pattern is an object-oriented design pattern. The crux of the pattern is that we define a set of states a value can have internally. The states are represented by a set of state objects, and the value’s behavior changes based on its state.
+
+ex: Blog -> "draft”, “review”, or “published”.
+
+advantage of using the state pattern:
+- business requirements of the program change, we won’t need to change the code of the value holding the state or the code that uses the value
+- update the code inside one of the state objects to change its rules or perhaps add more state objects.
+
+final functionality will look like this:
+- A blog post starts as an empty draft.
+- When the draft is done, a review of the post is requested.
+- When the post is approved, it gets published.
+- Only published blog posts return content to print, so unapproved posts can’t accidentally be published.
+
+ other changes attempted on a post should have no effect.
+allow the user to create a new draft blog post with Post::new
+- allow text to be added to the blog post
+- accessing post draft b/f approval should give nothing
+- enable a request for a review of the post, and we want content to return an empty string while waiting for the review
+- a/f approval gets published, hence returns the post
+
+crate used is `Post` type. Changing from one state to another will be managed internally within the Post type
+
+1. Defining the post in `blog.rs` file-> to hold some content
+
+whole done in `blog.rs` file with documentation 
 //macros are under chap 20, article 20.5
 //that's like last of the book
 
