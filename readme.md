@@ -5148,6 +5148,203 @@ crate used is `Post` type. Changing from one state to another will be managed in
 1. Defining the post in `blog.rs` file-> to hold some content
 
 whole done in `blog.rs` file with documentation 
+
+
+# Chap 19
+# Patterns and Matching
+Patterns are a special syntax in Rust for matching against the structure of types, both complex and simple.
+use with `match` construction to have more control over them in the program
+Pattern is combination of:
+- Literals
+- Destructured arrays, enums, structs, or tuples
+- Variables
+- Wildcards
+- Placeholders
+
+ex:x, (a, 3), and Some(Color::Red)
+
+Working-> 
+- components describe the shape of data.
+- program then matches values against the patterns to determine whether it has the correct shape of data to continue running a particular piece of code.
+
+## 19.1 | All the Places Patterns Can Be Used
+Pattern are used in various places in Rust, we have using them w/o knowing a damn thing about them.
+
+### `match` Arms
+use patterns in the arms of match expressions.
+match - a value to match on, and one or more match arms that consist of a pattern and an expression to run if the value matches that arm’s pattern
+```rs
+match VALUE {
+    PATTERN => EXPRESSION,
+    PATTERN => EXPRESSION,
+    PATTERN => EXPRESSION,
+}
+```
+
+ex:
+```rs
+match x {
+    None => None,   //None and Some are pattern here
+    Some(i) => Some(i + 1),
+}
+```
+Note: **need to be exhaustive in the sense that all possibilities for the value
+in the match expression must be accounted for**
+
+one way to ensure: **catch all** arm
+
+The particular pattern `_` will match anything, but it never binds to a variable, so it’s often used in the last match arm.
+The `_` pattern can be useful when you want to ignore any value not specified
+
+### Conditional `if let` Expressions
+a shorter way to write the equivalent of a match that only matches one case.
+optionally can have `else` code if any of condition just doesn't matches, that's
+like exception handling in case anything doesn't matches.
+
+gives us more flexibility than a match expression; ex:
+```rs
+fn main() {
+    let favorite_color: Option<&str> = None;
+    let is_tuesday = false;
+    let age: Result<u8, _> = "34".parse();
+
+    if let Some(color) = favorite_color {
+        //can also introduce new variables which shadow existing variables in the same way that match arms can
+        println!("Using your favorite color, {color}, as the background");
+    } else if is_tuesday {
+        println!("Tuesday is green day!");
+    } else if let Ok(age) = age {
+        if age > 30 {
+            println!("Using purple as the background color");
+        } else {
+            println!("Using orange as the background color");
+        }
+    } else {
+        println!("Using blue as the background color");
+    }
+}
+```
+
+downside of using if let expressions is that the compiler doesn’t check for
+exhaustiveness, whereas with match expressions it does
+
+say last else block was missed then the compiler wouldn't alert us to the possible logic bug.
+
+### `while let` Conditional Loops
+- allows a while loop to run for as long as a pattern continues to match
+previously we used it to keep looping as long as a stream produced new values:
+```rs
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for val in [1, 2, 3] {
+            tx.send(val).unwrap();
+        }
+    });
+
+    while let Ok(value) = rx.recv() {
+        println!("{value}");
+    }
+```
+
+### `for` loops
+when we write for loop, after the keyword `for` anything we write is a
+`pattern`.
+ex: `for x in y` -> `x` is pattern.
+
+ex:
+```rs
+    let v = vec!['a', 'b', 'c'];
+
+    for (index, value) in v.iter().enumerate() {    //adapt an iterator using the enumerate method so it produces a value and the index for that value, placed into a tuple.
+        println!("{value} is at index {index}");
+    }
+```
+
+o/p:
+```sh
+$ cargo run
+   Compiling patterns v0.1.0 (file:///projects/patterns)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.52s
+     Running `target/debug/patterns`
+a is at index 0
+b is at index 1
+c is at index 2
+```
+
+### `let` Statements
+consider this:
+`let x = 5;` this is also a `pattern`, more formally the definiton looks like:
+`let PATTERN = EXPRESSION;`
+
+x is a pattern that means “bind what matches here to the variable x.”
+since x is whole pattern-> “bind everything to the variable x, whatever the value is.” 
+
+consider for tuples:
+```rs
+    let (x, y, z) = (1, 2, 3);  //compares the value (1, 2, 3) to the pattern (x, y, z); binds 1 to x, 2 to y, and 3 to z
+        let (x, y) = (1, 2, 3); //error
+```
+
+### Function Parameters
+Function parameters can also be patterns.
+consider:
+```rs
+fn foo(x: i32) {    //x part is a pattern!
+    // match a tuple in a function’s arguments to the pattern.
+}
+```
+
+ex:
+```rs
+fn print_coordinates(&(x, y): &(i32, i32)) {
+    println!("Current location: ({x}, {y})");
+}
+
+fn main() {
+    let point = (3, 5); //values &(3, 5) match the pattern &(x, y)
+    //x=3,y=5
+    print_coordinates(&point);
+}
+```
+
+o/p:
+```sh
+Current location: (3, 5)
+```
+
+## 19.2 | Refutability: Whether a Pattern Might Fail to Match
+Pattern has 2 forms: `Refutable` & `irRefutable`
+1. **Irrefutable patterns** always match any value (e.g., `let x = 5;`), so they can’t fail.
+2. **Refutable patterns** may fail to match certain values (e.g., `Some(x)` may not match `None`).
+3. **`let`, function parameters, and `for` loops** require irrefutable patterns because they can't handle non-matching cases.
+4. **`if let`, `while let`, and `let-else`** accept both refutable and irrefutable patterns, but the compiler warns if you use an irrefutable one since it defeats the purpose of conditional logic.
+5. Understanding **refutability** helps you fix compiler errors when patterns don't match the construct they're used in.
+
+ex: use a refutable pattern where Rust requires an irrefutable pattern and vice vers
+`    let Some(x) = some_option_value;`
+- If some_option_value was a None value, it would fail to match the pattern Some(x), meaning the pattern is refutable
+- However, the let statement can only accept an irrefutable pattern because there is nothing valid the code can do with a None value.
+- complains at compilation Because we didn’t cover (and couldn’t cover!) every
+valid value with the pattern Some(x)
+
+use `if let` in case we have a refutable pattern where an irrefutable pattern is needed
+```rs
+    if let Some(x) = some_option_value {    //if the pattern doesn’t match, the code will just skip the code in the curly brackets
+        println!("{x}");    //runs perfectly
+    }
+```
+
+However, if we give if let an irrefutable pattern (a pattern that will always match), such as x, as shown below, the compiler will give a warning.
+```rs
+    if let x = 5 {
+        println!("{x}");
+    };
+```
+
+1. **`match` arms** use refutable patterns to handle multiple possible values, with the **last arm** typically using an irrefutable pattern to catch all remaining cases.
+2. A **single-arm `match` with an irrefutable pattern** is allowed but unnecessary—it can be replaced with a simpler `let` statement.
+
+
 //macros are under chap 20, article 20.5
 //that's like last of the book
 
