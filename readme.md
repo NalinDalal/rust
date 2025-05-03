@@ -5344,6 +5344,377 @@ However, if we give if let an irrefutable pattern (a pattern that will always ma
 1. **`match` arms** use refutable patterns to handle multiple possible values, with the **last arm** typically using an irrefutable pattern to catch all remaining cases.
 2. A **single-arm `match` with an irrefutable pattern** is allowed but unnecessary—it can be replaced with a simpler `let` statement.
 
+## 19.3 | Pattern Syntax
+gather all the syntax valid in patterns and discuss why and when you might want to use each one.
+
+### Matching Literals
+you can match patterns against literals directly. ex:
+```rs
+    let x = 1;
+
+    match x {
+        1 => println!("one"),
+        2 => println!("two"),
+        3 => println!("three"),
+        _ => println!("anything"),
+    }
+```
+
+### Matching Named Variables
+- Named variables are irrefutable patterns that match any value
+- complication in `match`, `if let`, `while let`-> starts a new scope, variables declared as part of a pattern inside the expression will shadow those with the same name outside, as is the case with all variables.
+```rs
+    let x = Some(5);
+    let y = 10;
+
+    match x {
+        Some(50) => println!("Got 50"), //pattern in the first match arm doesn’t match the defined value of x, 
+        //the code continues.
+        Some(y) => println!("Matched, y = {y}"),    //new scope declared, so
+        //doesn't refers to previous y
+        //new y binds to the inner value of the Some in x
+        _ => println!("Default case, x = {x:?}"),
+    }
+//no x introduced in match scope so shadows over outer x
+//now when match get's over, so it's y scope is also terminated
+    println!("at the end: x = {x:?}, y = {y}");
+```
+
+o/p:
+```bin
+Matched, y = 5
+at the end: x = Some(5), y = 10
+```
+
+### Multiple Patterns
+match multiple patterns using the `|` syntax.
+```rs
+    let x = 1;
+
+    match x {
+        1 | 2 => println!("one or two"),    //if the value of x matches either of the values in that arm, that arm’s code will run
+        3 => println!("three"),
+        _ => println!("anything"),
+    }
+
+```
+
+### Matching Ranges of Values with `..=`
+`..=` syntax allows us to match to an inclusive range of values.
+```rs
+    let x = 5;
+
+    match x {
+        1..=5 => println!("one through five"),  //If x is 1, 2, 3, 4, or 5, the first arm will match
+        _ => println!("something else"),
+    }
+```
+more practical than using the `|` operator
+- compiler checks that the range isn’t empty at compile time,
+
+```rs
+    let x = 'c';
+
+    match x {
+        'a'..='j' => println!("early ASCII letter"),
+        'k'..='z' => println!("late ASCII letter"),
+        _ => println!("something else"),
+    }
+
+```
+`Rust can tell that 'c' is within the first pattern’s range and prints early ASCII letter.`
+
+## Destructuring to Break Apart Values
+use patterns to destructure structs, enums, and tuples to use different parts of these values. Let’s walk through each value.
+
+### Destructuring structs
+
+This excerpt demonstrates how to **destructure a struct** in Rust using pattern matching with `let` and `match` statements. It uses a `Point` struct with `x` and `y` fields to show:
+
+1. **Basic destructuring** with custom variable names:
+
+   ```rust
+   let Point { x: a, y: b } = p;
+   ```
+
+   This assigns `p.x` to `a` and `p.y` to `b`.
+
+2. **Shorthand destructuring** where variable names match field names:
+
+   ```rust
+   let Point { x, y } = p;
+   ```
+
+   This assigns `p.x` to `x` and `p.y` to `y` more concisely.
+
+3. **Destructuring in `match` expressions**, including pattern matching with literal values:
+
+   ```rust
+   match p {
+       Point { x, y: 0 } => println!("On the x axis at {x}"),
+       Point { x: 0, y } => println!("On the y axis at {y}"),
+       Point { x, y } => println!("On neither axis: ({x}, {y})"),
+   }
+   ```
+
+   This allows matching specific struct field values while binding others, and shows how `match` stops at the first match.
+
+
+### Destructuring Enums
+ how to **destructure enum variants** in Rust using `match` patterns that reflect how each variant is defined:
+
+1. **Unit-like variant** (`Message::Quit`) has no data, so it’s matched directly without any destructuring.
+
+2. **Struct-like variant** (`Message::Move { x, y }`) uses curly braces and named fields, similar to struct destructuring.
+
+3. **Tuple-like variants** (`Message::Write(String)` and `Message::ChangeColor(i32, i32, i32)`) use parentheses with variables matching the number of elements.
+
+The example shows a `match` on a `Message` enum that destructures each variant appropriately to access and print its internal data. It highlights that the **pattern must match the shape and structure** of the enum variant being matched.
+```rs
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(i32, i32, i32),
+}
+
+fn main() {
+    let msg = Message::ChangeColor(0, 160, 255);
+
+    match msg {
+        Message::Quit => {
+            println!("The Quit variant has no data to destructure.");
+        }
+        Message::Move { x, y } => {
+            println!("Move in the x direction {x} and in the y direction {y}");
+        }
+        Message::Write(text) => {
+            println!("Text message: {text}");
+        }
+        Message::ChangeColor(r, g, b) => {
+            println!("Change the color to red {r}, green {g}, and blue {b}");
+        }
+    }
+}
+```
+
+### Destructuring Nested Structs and Enums
+```rs
+enum Color {
+    Rgb(i32, i32, i32),
+    Hsv(i32, i32, i32),
+}
+
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(Color),
+}
+
+fn main() {
+    let msg = Message::ChangeColor(Color::Hsv(0, 160, 255));
+
+    match msg {
+        Message::ChangeColor(Color::Rgb(r, g, b)) => {
+            println!("Change color to red {r}, green {g}, and blue {b}");
+        }
+        Message::ChangeColor(Color::Hsv(h, s, v)) => {
+            println!("Change color to hue {h}, saturation {s}, value {v}");
+        }
+        _ => (),
+    }
+}
+```
+- 1st arm matches a `Message::ChangeColor` enum variant that contains a `Color::Rgb` variant; then the pattern binds to the three inner `i32` values.
+- 2nd arm matches a `Message::ChangeColor` enum variant, but the inner enum matches `Color::Hsv` instead.
+
+### Destructuring Structs and Tuples
+destructure where we nest structs and tuples inside a tuple and destructure all the primitive values out:
+```rs
+    let ((feet, inches), Point { x, y }) = ((3, 10), Point { x: 3, y: -10 });
+```
+break complex types into their component parts so we can use the values we’re interested in separately.
+Destructuring with patterns is a convenient way to use pieces of values, such as the value from each field in a struct, separately from each other.
+
+### Ignoring Values in a Pattern
+it’s sometimes useful to ignore values in a pattern, such as in the last arm of a match, to get a catchall that doesn’t actually do anything but does account for all remaining possible values. 
+
+using the _ pattern (which you’ve seen), using the _ pattern within another pattern, using a name that starts with an underscore, or using .. to ignore remaining parts of a value.
+
+#### Ignoring an Entire Value with `_`
+a wildcard pattern that will match any value but not bind to the value.
+```rs
+fn foo(_: i32, y: i32) {
+    println!("This code only uses the y parameter: {y}");
+}
+
+fn main() {
+    foo(3, 4);
+}
+```
+
+#### Ignoring Parts of a Value with a Nested `_`
+use `_` inside another pattern to ignore just part of a value.
+want to test for only part of a value but have no use for the other parts in the corresponding code we want to run.
+```rs
+    let mut setting_value = Some(5);
+    let new_setting_value = Some(10);
+
+    match (setting_value, new_setting_value) {
+        (Some(_), Some(_)) => {
+            println!("Can't overwrite an existing customized value");
+        }
+        _ => {
+            setting_value = new_setting_value;
+        }
+    }
+
+    println!("setting is {setting_value:?}");
+```
+
+```bin
+Can't overwrite an existing customized value
+setting is Some(5)
+```
+In the first match arm, we don’t need to match on or use the values inside either `Some` variant, but we do need to test for the case when `setting_value` and `new_setting_value` are the Some variant.
+
+use underscores in multiple places within one pattern to ignore particular
+values.
+```rs
+    let numbers = (2, 4, 8, 16, 32);
+
+    match numbers {
+        (first, _, third, _, fifth) => {
+            println!("Some numbers: {first}, {third}, {fifth}")
+        }
+    }
+
+```
+
+```bin
+Some numbers: 2, 8, 32
+```
+
+#### Ignoring an Unused Variable by Starting Its Name with `_`
+you can tell Rust not to warn you about the unused variable by starting the name of the variable with an underscore. 
+
+syntax `_x` still binds the value to the variable, whereas `_` doesn’t bind at all.
+```rs
+    let s = Some(String::from("Hello!"));
+
+    if let Some(_s) = s {   //doesn't compiles
+        println!("found a string");
+    }
+    //because the s value will still be moved into _s, which prevents us from using s again
+    println!("{s:?}");
+
+```
+
+correct code:
+```rs
+    let s = Some(String::from("Hello!"));
+
+    if let Some(_) = s {
+        println!("found a string");
+    }
+//because we never bind s to anything; it isn’t moved.
+    println!("{s:?}");
+
+```
+
+#### Ignoring Remaining Parts of a Value with `..`
+we can use the `..` syntax to use specific parts and ignore the rest,
+The `..` pattern ignores any parts of a value that we haven’t explicitly matched in the rest of the pattern
+
+consider, we want to operate only on the x coordinate and ignore the values in the y and z fields.
+```rs
+    struct Point {
+        x: i32,
+        y: i32,
+        z: i32,
+    }
+
+    let origin = Point { x: 0, y: 0, z: 0 };
+
+    match origin {
+        Point { x, .. } => println!("x is {x}"),    //quicker than having to list y: _ and z: _
+    }
+    //syntax .. will expand to as many values as it needs to be.
+```
+
+ex:
+```rs
+fn main() {
+    let numbers = (2, 4, 8, 16, 32);
+
+    match numbers {
+        (first, .., last) => {
+            println!("Some numbers: {first}, {last}");
+        }
+    }
+}
+```
+but 
+`.., second, ..` is wrong cause 
+`           (.., second, ..) => {
+  |          --          ^^ can only be used once per tuple pattern
+  |          |
+`
+reason: impossible for Rust to determine how many values in the tuple to ignore before matching a value with second and then how many further values to ignore thereafter.
+
+#### Extra Conditionals with Match Guards
+A match guard is an additional `if` condition, specified after the pattern in a `match` arm, that must also match for that arm to be chosen.
+- useful for expressing more complex ideas than a pattern alone allows.
+only available in match expressions
+```rs
+    let num = Some(4);
+
+    match num {
+        Some(x) if x % 2 == 0 => println!("The number {x} is even"),    //x%2==0 is match guard; true if num is even
+        //Some(4) matches Some(x);Then the match guard checks whether the remainder of dividing x by 2 is equal to 0
+        Some(x) => println!("The number {x} is odd"),
+        None => (),
+    }
+```
+
+downside of this additional expressiveness is that the compiler doesn’t try to check for exhaustiveness when match guard expressions are involved.
+
+have a deault case declared as:
+```rs
+    let x = 4;
+    let y = false;
+
+    match x {
+        4 | 5 | 6 if y => println!("yes"),  //only matches if the value of x is equal to 4, 5, or 6 and if y is true.
+        _ => println!("no"),
+    }
+
+```
+
+## `@` Bindings
+ at operator `@` lets us create a variable that holds a value at the same time as we’re testing that value for a pattern match.
+```rs
+    enum Message {
+        Hello { id: i32 },
+    }
+
+    let msg = Message::Hello { id: 5 };
+
+    match msg {
+        Message::Hello {
+            id: id_variable @ 3..=7,
+            //we’re capturing whatever value matched the range while also testing that the value matched the range pattern.
+        } => println!("Found an id in range: {id_variable}"),
+        Message::Hello { id: 10..=12 } => {
+            println!("Found an id in another range")
+        }
+        Message::Hello { id } => println!("Found some other id: {id}"),
+    }
+
+```
+Using @ lets us test a value and save it in a variable within one pattern.
+
 
 //macros are under chap 20, article 20.5
 //that's like last of the book
