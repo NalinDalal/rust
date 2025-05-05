@@ -5953,12 +5953,513 @@ cargo +nightly miri run or cargo +nightly miri test     # use in project
 If Miri does catch a problem, you know there’s a bug, but just because Miri doesn’t catch a bug doesn’t mean there isn’t a problem.
 
 ## 20.2 | Advanced Traits
+getting into the nitty-gritty of traits.
+
+### Specifying Placeholder Types in Trait Definitions with Associated Types
+associated types are inserted into signatures of traits.
+ex: Iterator trait that the standard library provides
+```rs
+pub trait Iterator {
+    type Item;  //Item is associated type which is a placeholder
+
+    fn next(&mut self) -> Option<Self::Item>;
+}
+```
+
+consider following example to differ b/w Associated Types and Generics:
+```rs
+impl Iterator for Counter {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // --snip--
+```
+
+```rs
+pub trait Iterator<T> {
+    fn next(&mut self) -> Option<T>;
+}
+```
+
+while using generics we must annotate the types in each implementation
+
+when a trait has a generic parameter, it can be implemented for a type multiple times, changing the concrete types of the generic type parameters each time.
+
+With associated types, we don’t need to annotate types because we can’t implement a trait on a type multiple times.
+
+Associated types also become part of the trait’s contract: implementors of the
+trait must provide a type to stand in for the associated type placeholder.
+
+## Default Generic Type Parameters and Operator Overloading
+
+Rust allows setting **default types** for generic parameters using the syntax `<T=DefaultType>`. This is useful when the default works in most cases, so implementors don’t have to explicitly specify it.
+
+### Operator Overloading with Traits
+
+Rust doesn’t let you define custom operators, but it does let you overload existing ones like `+` by implementing traits from `std::ops`. For example, the `Add` trait is used to overload the `+` operator.
+
+Here's how you can add two `Point` instances using `Add`:
+
+```rust
+// Filename: src/main.rs
+use std::ops::Add;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Add for Point {
+    type Output = Point;
+
+    fn add(self, other: Point) -> Point {
+        Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+fn main() {
+    assert_eq!(
+        Point { x: 1, y: 0 } + Point { x: 2, y: 3 },
+        Point { x: 3, y: 3 }
+    );
+}
+```
+
+This works because `Add` is defined as:
+
+```rust
+trait Add<Rhs=Self> {
+    type Output;
+    fn add(self, rhs: Rhs) -> Self::Output;
+}
+```
+
+Here, `Rhs` (right-hand side) defaults to `Self`, so `Add for Point` assumes `Point + Point`.
+
+### Customizing the Right-Hand Side
+
+You can override the default `Rhs` when needed. For instance, adding `Millimeters` and `Meters`:
+
+```rust
+// Filename: src/lib.rs
+use std::ops::Add;
+
+struct Millimeters(u32);
+struct Meters(u32);
+
+impl Add<Meters> for Millimeters {
+    type Output = Millimeters;
+
+    fn add(self, other: Meters) -> Millimeters {
+        Millimeters(self.0 + (other.0 * 1000))
+    }
+}
+```
+
+This uses the **newtype pattern** (wrapping existing types in structs) and shows how to handle unit conversions during addition.
+
+### When to Use Default Type Parameters
+
+1. **To extend traits without breaking existing code**
+2. **To simplify common use cases while allowing advanced customization**
+
+The `Add` trait is a great example—it covers typical same-type addition but lets you opt into more complex behavior when needed.
+
+### Fully Qualified Syntax for Disambiguation: Calling Methods with the Same Name
+
+Rust allows multiple traits (and types) to define methods with the same name. When a type implements several traits with identically named methods—or has its own method with that name—you must **disambiguate** which one to call.
+
+### Example with Methods
+
+Two traits, `Pilot` and `Wizard`, both define a `fly` method. The `Human` struct implements both traits and also defines its own `fly` method:
+
+```rust
+// Filename: src/main.rs
+trait Pilot {
+    fn fly(&self);
+}
+
+trait Wizard {
+    fn fly(&self);
+}
+
+struct Human;
+
+impl Pilot for Human {
+    fn fly(&self) {
+        println!("This is your captain speaking.");
+    }
+}
+
+impl Wizard for Human {
+    fn fly(&self) {
+        println!("Up!");
+    }
+}
+
+impl Human {
+    fn fly(&self) {
+        println!("*waving arms furiously*");
+    }
+}
+```
+
+When you call `person.fly()`, Rust chooses the method directly implemented on the type:
+
+```rust
+fn main() {
+    let person = Human;
+    person.fly();
+}
+```
+
+Output:
+
+```
+*waving arms furiously*
+```
+
+To call the trait methods explicitly, use the trait name:
+
+```rust
+fn main() {
+    let person = Human;
+    Pilot::fly(&person);
+    Wizard::fly(&person);
+    person.fly();
+}
+```
+
+Output:
+
+```
+This is your captain speaking.
+Up!
+*waving arms furiously*
+```
+
+### Example with Associated Functions (No `self`)
+
+With associated functions (functions not using `self`), Rust can't infer which trait you mean when names clash. For example:
+
+```rust
+trait Animal {
+    fn baby_name() -> String;
+}
+
+struct Dog;
+
+impl Dog {
+    fn baby_name() -> String {
+        String::from("Spot")
+    }
+}
+
+impl Animal for Dog {
+    fn baby_name() -> String {
+        String::from("puppy")
+    }
+}
+
+fn main() {
+    println!("A baby dog is called a {}", Dog::baby_name());
+}
+```
+
+This prints:
+
+```
+A baby dog is called a Spot
+```
+
+If you try to call `Animal::baby_name()`, Rust doesn’t know which type’s implementation to use:
+
+```rust
+// This fails to compile
+fn main() {
+    println!("A baby dog is called a {}", Animal::baby_name());
+}
+```
+
+To fix this, use **fully qualified syntax**:
+
+```rust
+fn main() {
+    println!("A baby dog is called a {}", <Dog as Animal>::baby_name());
+}
+```
+
+Output:
+
+```
+A baby dog is called a puppy
+```
+
+### Fully Qualified Syntax Format
+
+Use this when disambiguation is needed:
+
+```
+<Type as Trait>::function(arguments...);
+```
+
+Use it when:
+
+* Multiple traits define the same method name.
+* Traits define associated functions without `self`.
+* Rust can't infer the type from context.
+
+In most cases, you don’t need this syntax unless there's a name conflict.
+
+---
+
+### Using Supertraits to Require One Trait’s Functionality Within Another Trait
+
+Sometimes, you might write a trait definition that depends on another trait: for a type to implement the first trait, you want to require that type to also implement the second trait. You would do this so that your trait definition can make use of the associated items of the second trait. The trait your trait definition is relying on is called a *supertrait* of your trait.
+
+For example, let’s say we want to make an `OutlinePrint` trait with an `outline_print` method that will print a given value formatted so that it’s framed in asterisks. That is, given a `Point` struct that implements the standard library trait `Display` to result in `(x, y)`, when we call `outline_print` on a `Point` instance that has `1` for `x` and `3` for `y`, it should print the following:
+
+```
+**********
+*        *
+* (1, 3) *
+*        *
+**********
+```
+
+In the implementation of the `outline_print` method, we want to use the `Display` trait’s functionality. Therefore, we need to specify that the `OutlinePrint` trait will work only for types that also implement `Display` and provide the functionality that `OutlinePrint` needs. We can do that in the trait definition by specifying `OutlinePrint: Display`. This technique is similar to adding a trait bound to the trait. Listing 20-23 shows an implementation of the `OutlinePrint` trait.
+
+#### Filename: src/main.rs
+
+```rust
+use std::fmt;
+
+trait OutlinePrint: fmt::Display {
+    fn outline_print(&self) {
+        let output = self.to_string();
+        let len = output.len();
+        println!("{}", "*".repeat(len + 4));
+        println!("*{}*", " ".repeat(len + 2));
+        println!("* {output} *");
+        println!("*{}*", " ".repeat(len + 2));
+        println!("{}", "*".repeat(len + 4));
+    }
+}
+```
+
+Listing 20-23: Implementing the `OutlinePrint` trait that requires the functionality from `Display`.
+
+Because we’ve specified that `OutlinePrint` requires the `Display` trait, we can use the `to_string` function that is automatically implemented for any type that implements `Display`. If we tried to use `to_string` without adding a colon and specifying the `Display` trait after the trait name, we’d get an error saying that no method named `to_string` was found for the type `&Self` in the current scope.
+
+Let’s see what happens when we try to implement `OutlinePrint` on a type that doesn’t implement `Display`, such as the `Point` struct:
+
+#### Filename: src/main.rs
+
+This code does not compile!
+
+```rust
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl OutlinePrint for Point {}
+```
+
+We get an error saying that `Display` is required but not implemented:
+
+```
+error[E0277]: `Point` doesn't implement `std::fmt::Display`
+   --> src/main.rs:20:23
+    |
+20  | impl OutlinePrint for Point {}
+    |                       ^^^^^ `Point` cannot be formatted with the default formatter
+```
+
+To fix this, we implement `Display` on `Point` and satisfy the constraint that `OutlinePrint` requires, like so:
+
+#### Filename: src/main.rs
+
+```rust
+use std::fmt;
+
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+```
+
+Then implementing the `OutlinePrint` trait on `Point` will compile successfully, and we can call `outline_print` on a `Point` instance to display it within an outline of asterisks.
+
+---
+
+### Using the Newtype Pattern to Implement External Traits on External Types
+
+In Chapter 10 in the “Implementing a Trait on a Type” section, we mentioned the *orphan rule* that states we’re only allowed to implement a trait on a type if either the trait or the type are local to our crate. It’s possible to get around this restriction using the *newtype pattern*, which involves creating a new type in a tuple struct.
+
+The tuple struct will have one field and be a thin wrapper around the type we want to implement a trait for. Then the wrapper type is local to our crate, and we can implement the trait on the wrapper. *Newtype* is a term that originates from the Haskell programming language. There is no runtime performance penalty for using this pattern, and the wrapper type is elided at compile time.
+
+As an example, let’s say we want to implement `Display` on `Vec<T>`, which the orphan rule prevents us from doing directly because the `Display` trait and the `Vec<T>` type are defined outside our crate. We can make a `Wrapper` struct that holds an instance of `Vec<T>`; then we can implement `Display` on `Wrapper` and use the `Vec<T>` value, as shown in Listing 20-24.
+
+#### Filename: src/main.rs
+
+```rust
+use std::fmt;
+
+struct Wrapper(Vec<String>);
+
+impl fmt::Display for Wrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}]", self.0.join(", "))
+    }
+}
+
+fn main() {
+    let w = Wrapper(vec![String::from("hello"), String::from("world")]);
+    println!("w = {w}");
+}
+```
+
+Listing 20-24: Creating a `Wrapper` type around `Vec<String>` to implement `Display`.
+
+The implementation of `Display` uses `self.0` to access the inner `Vec<T>`, because `Wrapper` is a tuple struct and `Vec<T>` is the item at index 0 in the tuple. Then we can use the functionality of the `Display` trait on `Wrapper`.
+
+The downside of using this technique is that `Wrapper` is a new type, so it doesn’t have the methods of the value it’s holding. We would have to implement all the methods of `Vec<T>` directly on `Wrapper` such that the methods delegate to `self.0`, which would allow us to treat `Wrapper` exactly like a `Vec<T>`. If we wanted the new type to have every method the inner type has, implementing the `Deref` trait (discussed in Chapter 15 in the “Treating Smart Pointers Like Regular References with the Deref Trait” section) on the `Wrapper` to return the inner type would be a solution. If we don’t want the `Wrapper` type to have all the methods of the inner type—for example, to restrict the `Wrapper` type’s behavior—we would have to implement just the methods we do want manually.
+
+This *newtype pattern* is also useful even when traits are not involved. Let’s switch focus and look at some advanced ways to interact with Rust’s type system.
+
+---
+
+## 20.3 | Here’s your cleaned-up version with headings preserved using `###`, and all code blocks and structure intact:
+
+---
+
+### Using Supertraits to Require One Trait’s Functionality Within Another Trait
+
+Sometimes, you might write a trait definition that depends on another trait: for a type to implement the first trait, you want to require that type to also implement the second trait. You would do this so that your trait definition can make use of the associated items of the second trait. The trait your trait definition is relying on is called a *supertrait* of your trait.
+
+For example, let’s say we want to make an `OutlinePrint` trait with an `outline_print` method that will print a given value formatted so that it’s framed in asterisks. That is, given a `Point` struct that implements the standard library trait `Display` to result in `(x, y)`, when we call `outline_print` on a `Point` instance that has `1` for `x` and `3` for `y`, it should print the following:
+
+```
+**********
+*        *
+* (1, 3) *
+*        *
+**********
+```
+
+In the implementation of the `outline_print` method, we want to use the `Display` trait’s functionality. Therefore, we need to specify that the `OutlinePrint` trait will work only for types that also implement `Display` and provide the functionality that `OutlinePrint` needs. We can do that in the trait definition by specifying `OutlinePrint: Display`. This technique is similar to adding a trait bound to the trait. Listing 20-23 shows an implementation of the `OutlinePrint` trait.
+
+#### Filename: src/main.rs
+
+```rust
+use std::fmt;
+
+trait OutlinePrint: fmt::Display {
+    fn outline_print(&self) {
+        let output = self.to_string();
+        let len = output.len();
+        println!("{}", "*".repeat(len + 4));
+        println!("*{}*", " ".repeat(len + 2));
+        println!("* {output} *");
+        println!("*{}*", " ".repeat(len + 2));
+        println!("{}", "*".repeat(len + 4));
+    }
+}
+```
+
+Listing 20-23: Implementing the `OutlinePrint` trait that requires the functionality from `Display`.
+
+Because we’ve specified that `OutlinePrint` requires the `Display` trait, we can use the `to_string` function that is automatically implemented for any type that implements `Display`. If we tried to use `to_string` without adding a colon and specifying the `Display` trait after the trait name, we’d get an error saying that no method named `to_string` was found for the type `&Self` in the current scope.
+
+Let’s see what happens when we try to implement `OutlinePrint` on a type that doesn’t implement `Display`, such as the `Point` struct:
+
+#### Filename: src/main.rs
+
+This code does not compile!
+
+```rust
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl OutlinePrint for Point {}
+```
+
+We get an error saying that `Display` is required but not implemented:
+
+```
+error[E0277]: `Point` doesn't implement `std::fmt::Display`
+   --> src/main.rs:20:23
+    |
+20  | impl OutlinePrint for Point {}
+    |                       ^^^^^ `Point` cannot be formatted with the default formatter
+```
+
+To fix this, we implement `Display` on `Point` and satisfy the constraint that `OutlinePrint` requires, like so:
+
+#### Filename: src/main.rs
+
+```rust
+use std::fmt;
+
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+```
+
+Then implementing the `OutlinePrint` trait on `Point` will compile successfully, and we can call `outline_print` on a `Point` instance to display it within an outline of asterisks.
+
+---
+
+### Using the Newtype Pattern to Implement External Traits on External Types
+
+In Chapter 10 in the “Implementing a Trait on a Type” section, we mentioned the *orphan rule* that states we’re only allowed to implement a trait on a type if either the trait or the type are local to our crate. It’s possible to get around this restriction using the *newtype pattern*, which involves creating a new type in a tuple struct.
+
+The tuple struct will have one field and be a thin wrapper around the type we want to implement a trait for. Then the wrapper type is local to our crate, and we can implement the trait on the wrapper. *Newtype* is a term that originates from the Haskell programming language. There is no runtime performance penalty for using this pattern, and the wrapper type is elided at compile time.
+
+As an example, let’s say we want to implement `Display` on `Vec<T>`, which the orphan rule prevents us from doing directly because the `Display` trait and the `Vec<T>` type are defined outside our crate. We can make a `Wrapper` struct that holds an instance of `Vec<T>`; then we can implement `Display` on `Wrapper` and use the `Vec<T>` value, as shown in Listing 20-24.
+
+#### Filename: src/main.rs
+
+```rust
+use std::fmt;
+
+struct Wrapper(Vec<String>);
+
+impl fmt::Display for Wrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}]", self.0.join(", "))
+    }
+}
+
+fn main() {
+    let w = Wrapper(vec![String::from("hello"), String::from("world")]);
+    println!("w = {w}");
+}
+```
+
+Listing 20-24: Creating a `Wrapper` type around `Vec<String>` to implement `Display`.
+
+The implementation of `Display` uses `self.0` to access the inner `Vec<T>`, because `Wrapper` is a tuple struct and `Vec<T>` is the item at index 0 in the tuple. Then we can use the functionality of the `Display` trait on `Wrapper`.
+
+The downside of using this technique is that `Wrapper` is a new type, so it doesn’t have the methods of the value it’s holding. We would have to implement all the methods of `Vec<T>` directly on `Wrapper` such that the methods delegate to `self.0`, which would allow us to treat `Wrapper` exactly like a `Vec<T>`. If we wanted the new type to have every method the inner type has, implementing the `Deref` trait (discussed in Chapter 15 in the “Treating Smart Pointers Like Regular References with the Deref Trait” section) on the `Wrapper` to return the inner type would be a solution. If we don’t want the `Wrapper` type to have all the methods of the inner type—for example, to restrict the `Wrapper` type’s behavior—we would have to implement just the methods we do want manually.
+
+This *newtype pattern* is also useful even when traits are not involved. Let’s switch focus and look at some advanced ways to interact with Rust’s type system.
+
+---
+## 20.3 | Advanced Types
 
 
-//macros are under chap 20, article 20.5
-//that's like last of the book
-
-# Macro
+# 20.5 | Macro
 basically to expand single line into multiple lines
 powerful feature that allows for metaprogramming by enabling the generation of code at compile-time
 
