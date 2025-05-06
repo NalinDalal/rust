@@ -6457,23 +6457,426 @@ This *newtype pattern* is also useful even when traits are not involved. Let’s
 
 ---
 ## 20.3 | Advanced Types
+rust has some types which we haven't discussed yet.
+let's discuss them one by one.
+
+start by `newtypes`; why newtypes are useful as types. 
+Then we’ll move on to `type aliases`, a feature similar to newtypes but with slightly different semantics. 
+discuss the `!` type and dynamically sized types.
+
+### Using the Newtype Pattern for Type Safety and Abstraction
+1. **Type Safety and Unit Distinction:**
+   Newtypes help prevent mixing up values by enforcing type safety at compile time.
+   *Example:* `Millimeters(u32)` and `Meters(u32)` are distinct types, so a function expecting `Millimeters` won’t accept `Meters` or `u32` by mistake.
+
+2. **Abstraction of Implementation Details:**
+   Newtypes allow developers to expose a tailored public API while hiding the internal type’s API, giving more control over how a type is used.
+
+3. **Encapsulation and Internal Hiding:**
+   They enable encapsulation by concealing internal data structures.
+   *Example:* A `People` newtype wrapping `HashMap<i32, String>` can provide methods like `add_name()` without exposing how names are stored or IDs are assigned.
+
+### Creating Type Synonyms with Type Aliases
+Rust provides the ability to declare a type alias to give an existing type another name. use `type` keyword
+ex:
+```rs
+    type Kilometers = i32;
+    let x: i32 = 5;
+    let y: Kilometers = 5;
+
+    println!("x + y = {}", x + y);  //both kilometers and i32 are same type so can be add
+    //but we don’t get the type checking benefits that we get from the newtype pattern
+    //if we mix them up, compiler won't give error
+
+```
+main use case for type synonyms is to **reduce repetition**.
+ex: `Box<dyn Fn() + Send + 'static>`
+to lengthy man, upon implementing into code:
+```rs
+    let f: Box<dyn Fn() + Send + 'static> = Box::new(|| println!("hi"));
+
+    fn takes_long_type(f: Box<dyn Fn() + Send + 'static>) {
+        // --snip--
+    }
+
+    fn returns_long_type() -> Box<dyn Fn() + Send + 'static> {
+        // --snip--
+    }
+```
+A type alias makes this code more manageable by reducing the repetition, ex:
+```rs
+    type Thunk = Box<dyn Fn() + Send + 'static>;
+
+    let f: Thunk = Box::new(|| println!("hi"));
+    //Thunk introduced for the verbose type and can replace all uses of the type with the shorter alias Thunk.
+
+    fn takes_long_type(f: Thunk) {
+        // --snip--
+    }
+
+    fn returns_long_type() -> Thunk {
+        // --snip--
+    }
+```
+
+`thunk` is a word for code to be evaluated at a later time, so it’s an appropriate name for a closure that gets stored.
+Type aliases are also commonly used with the `Result<T, E>` type for reducing repetition.
+```rs
+use std::fmt;
+use std::io::Error; //represents all possible I/O errors.
+
+pub trait Write {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Error>;
+    fn flush(&mut self) -> Result<(), Error>;
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), Error>;
+    fn write_fmt(&mut self, fmt: fmt::Arguments) -> Result<(), Error>;
+}
+```
 
 
-# 20.5 | Macro
+I/O operations often return a Result<T, E> to handle situations when operations fail to work.
+E is std::io::Error
+
+Result<..., Error> is repeated a lot. As such, std::io has this type alias declaration:
+```rs
+type Result<T> = std::result::Result<T, std::io::Error>;
+```
+
+we can use `std::io::Result<T>`; that is, a `Result<T, E>` with the E filled in
+as `std::io::Error`.fun becomes:
+```rs
+pub trait Write {
+    fn write(&mut self, buf: &[u8]) -> Result<usize>;
+    fn flush(&mut self) -> Result<()>;
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<()>;
+    fn write_fmt(&mut self, fmt: fmt::Arguments) -> Result<()>;
+}
+```
+
+### The Never Type that Never Returns
+a special type named ! that’s known in type theory lingo as the empty type because it has no values.
+```rs
+fn bar() -> ! {
+    // --snip--
+}
+```
+read as “the function bar returns never.” 
+
+**Functions that return never are called diverging functions.**
+
+```rs
+use rand::Rng;
+use std::cmp::Ordering;
+use std::io;
+
+fn main() {
+    println!("Guess the number!");
+
+    let secret_number = rand::thread_rng().gen_range(1..=100);
+
+    println!("The secret number is: {secret_number}");
+
+    loop {
+        println!("Please input your guess.");
+
+        let mut guess = String::new();
+
+        // --snip--
+
+        io::stdin()
+            .read_line(&mut guess)
+            .expect("Failed to read line");
+
+        let guess: u32 = match guess.trim().parse() {
+            Ok(num) => num,
+            Err(_) => continue,
+        };
+
+        println!("You guessed: {guess}");
+
+        // --snip--
+
+        match guess.cmp(&secret_number) {
+            Ordering::Less => println!("Too small!"),
+            Ordering::Greater => println!("Too big!"),
+            Ordering::Equal => {
+                println!("You win!");
+                break;
+            }
+        }
+    }
+}
+```
+
+**match arms must all return the same type**
+so then this doesn't works:
+```rs
+    let guess = match guess.trim().parse() {    //type are u32 and String
+        //but rust has only one type available
+        Ok(_) => 5,
+        Err(_) => "hello",
+    };
+    //2 value one with i32 and other with String
+    //rust lloks over it, finds a normal and another with !
+    //ignore one with `!` hence i32 is return typr
+
+```
+
+never type is useful with the panic! macro as well. Recall the unwrap function that we call on `Option<T>` values to produce a value or panic with this definition:
+```rs
+impl<T> Option<T> {
+    pub fn unwrap(self) -> T {
+        match self {
+            Some(val) => val,       //val has type T
+            None => panic!("called `Option::unwrap()` on a `None` value"),
+            //panic has type `!`    ; panic! doesn’t produce a value; it ends the program
+            //so overall return type is `T`
+        }
+    }
+}
+```
+
+ex:
+```rs
+    print!("forever ");
+
+    loop {
+        print!("and ever ");
+    }       //the loop never ends, so ! is the value of the expression
+
+```
+
+### Dynamically Sized Types and the `Sized` Trait
+
+1. Rust needs to know how much space to allocate for types at compile time.
+This is why most types must have a known, fixed size.
+
+2. Dynamically Sized Types (DSTs) are types whose size is only known at runtime.
+The most common example is `str` (not `&str`), which is unsized.
+
+```rs
+let s1: str = "Hello there!";         // ❌ Error: `str` is unsized
+let s2: str = "How's it going?";      // ❌ Error: cannot create variables of type `str`
+```
+
+3. Above code fails because Rust can't allocate space for a variable of an unknown size.
+`s1` needs 12 bytes, `s2` needs 15 — they’re not uniform in size.
+
+
+4. The correct way to use `str` is via references or pointers — i.e., `&str`.
+```rs
+let s1: &str = "Hello there!";        // ✅ OK: `&str` includes address + length metadata
+let s2: &str = "How's it going?";     // ✅ OK
+```
+
+5. `&str` is a "fat pointer": it contains both a pointer to the string and its length.
+This makes the total size of a `&str` fixed and known at compile time.
+
+6. The rule: DSTs like `str` must always be used behind some kind of pointer (`&`, `Box`, `Rc`, etc.)
+```rs
+let b: Box<str> = "owned string".into();   // ✅ Box<str> is allowed
+```
+
+7. Trait objects are another kind of DST. You can only use trait objects behind pointers.
+```rs
+trait Speak {
+    fn say(&self);
+}
+
+fn use_trait_object(speaker: &dyn Speak) {
+    speaker.say();  // ✅ Using a DST trait object via a reference
+}
+```
+
+8. You can also use trait objects with Box or Rc:
+```rs
+Box<dyn Trait>, Rc<dyn Trait>, etc.
+
+use std::rc::Rc;
+
+fn use_rc_trait_object(speaker: Rc<dyn Speak>) {
+    speaker.say();  // ✅ Still behind a pointer
+}
+```
+
+9. The `Sized` trait represents types known at compile time. Rust assumes all generic types `T` are `Sized` by default.
+```rs
+fn generic<T>(t: T) {
+    // really means:
+    // fn generic<T: Sized>(t: T)
+}
+```
+
+10. To allow a generic function to accept DSTs, we use `?Sized`:
+```rs
+fn generic_unsized<T: ?Sized>(t: &T) {
+    // ✅ OK: `T` may or may not be `Sized`, but must be behind a pointer
+}
+```
+
+11. The `?Sized` syntax is unique to the `Sized` trait. You can't use `?Trait` with any other trait — this only works for `Sized`.
+
+12. When working with DSTs in custom structs, you must use indirection:
+```rs
+// struct MyStrWrapper { value: str }         // ❌ Error: unsized field not behind pointer
+struct MyStrWrapper { value: Box<str> }       // ✅ OK: DST behind pointer
+```
+
+13. You cannot place DSTs in the middle of a struct — only the last field can be DST and must be behind a pointer.
+
+14. DSTs are powerful but restricted to prevent memory layout issues at compile time.
+
+15. Summary rule: Always access dynamically sized types through pointers and use `?Sized` in generics when necessary.
+
+
+## 20. 4 | Functions and Closures
+explore about functions and closures, including function pointers and returning closures.
+
+### Function pointers
+
+```rust
+// Filename: src/main.rs
+
+fn add_one(x: i32) -> i32 {
+    x + 1
+}
+
+fn do_twice(f: fn(i32) -> i32, arg: i32) -> i32 {
+    f(arg) + f(arg)
+}
+
+fn main() {
+    let answer = do_twice(add_one, 5);
+
+    println!("The answer is: {answer}");
+}
+```
+
+* The code above shows how **function pointers (`fn`)** can be passed to functions in Rust.
+* The `fn` type is different from the `Fn` closure trait—it is a **function pointer**, not a trait.
+* Function pointers allow **passing regular functions** as arguments to other functions.
+* In `do_twice`, we specify a parameter of type `fn(i32) -> i32` to accept a function pointer.
+* The function `f` is then **called twice** inside `do_twice`, and the results are added.
+* The result is `add_one(5) + add_one(5) = 6 + 6 = 12`.
+* Unlike closures, `fn` is a **concrete type**, so you don’t need to use generics or trait bounds.
+* **Function pointers implement `Fn`, `FnMut`, and `FnOnce`**, so they can be passed to functions expecting closures.
+* It’s best practice to use **generic parameters with `Fn` traits** to accept both closures and function pointers.
+* If you’re interfacing with **external code (e.g., C)** that only accepts function pointers, you must use `fn`, not closures.
+* You can use either **closures or named functions** in methods like `map`.
+
+```rust
+let list_of_numbers = vec![1, 2, 3];
+let list_of_strings: Vec<String> =
+    list_of_numbers.iter().map(|i| i.to_string()).collect();
+```
+
+* Alternatively, you can use a **named function** instead of a closure:
+
+```rust
+let list_of_numbers = vec![1, 2, 3];
+let list_of_strings: Vec<String> =
+    list_of_numbers.iter().map(ToString::to_string).collect();
+```
+
+* Note the use of **fully qualified syntax** (`ToString::to_string`) to avoid ambiguity with other `to_string` methods.
+* **Enum variant constructors** can also be used as function pointers that act like closures:
+
+```rust
+enum Status {
+    Value(u32),
+    Stop,
+}
+
+let list_of_statuses: Vec<Status> = (0u32..20).map(Status::Value).collect();
+```
+
+* In this example, `Status::Value` is used as a constructor function inside `map`, producing a vector of enum values.
+* **Both closures and named functions** compile to the same code—use whichever improves clarity and readability.
+
+### Returning Closures
+
+```rust
+fn returns_closure() -> impl Fn(i32) -> i32 {
+    |x| x + 1
+}
+```
+
+* 1. Closures in Rust are **represented as anonymous types** that implement one or more closure traits: `Fn`, `FnMut`, or `FnOnce`.
+* 2. Since each closure has its **own unique, compiler-generated type**, you **cannot return it directly by naming its type**.
+* 3. You also **can’t use `fn` (function pointer)** to return closures, because closures can capture variables and `fn` cannot.
+* 4. Instead, use `impl Trait` syntax to **return a closure that implements a specific trait**, like `impl Fn(...)`.
+
+```rust
+fn returns_closure() -> impl Fn(i32) -> i32 {
+    |x| x + 1
+}
+```
+
+* 5. The above function returns a closure that adds 1 to its input and uses `impl Fn(i32) -> i32` to abstract over the concrete type.
+* 6. However, each closure has a unique type, so you **can’t return multiple different closures** from one function or in a collection using just `impl Trait`.
+* 7. To store different closures in the same collection, **you must use trait objects**.
+
+```rust
+fn main() {
+    let handlers = vec![returns_closure(), returns_initialized_closure(123)];
+    for handler in handlers {
+        let output = handler(5);
+        println!("{output}");
+    }
+}
+
+fn returns_closure() -> Box<dyn Fn(i32) -> i32> {
+    Box::new(|x| x + 1)
+}
+
+fn returns_initialized_closure(init: i32) -> Box<dyn Fn(i32) -> i32> {
+    Box::new(move |x| x + init)
+}
+```
+
+* 8. Here, closures are wrapped in `Box<dyn Fn(i32) -> i32>` to **enable dynamic dispatch** and store them together in a `Vec`.
+* 9. `Box<dyn Fn...>` is a **trait object**, allowing different closure implementations to share a common type at runtime.
+* 10. The use of `move` in `returns_initialized_closure` lets the closure **capture and use** the `init` variable.
+* 11. Attempting to use `impl Fn(...)` for both would fail, because **`impl Trait` cannot unify multiple unique types**.
+* 12. Trait objects like `Box<dyn Fn>` are heap-allocated and use **dynamic dispatch** to call the appropriate closure at runtime.
+* 13. You use **`Box` (or `Rc`, `Arc`)** for ownership and trait object wrapping.
+* 14. This approach is ideal for **handling a collection of heterogeneous closures** with the same interface.
+* 15. Prefer `impl Fn` when returning a single closure, and use `Box<dyn Fn>` for dynamic dispatch when **flexibility or polymorphism is needed**.
+
+---
+
+# 20.5 | Macros in Rust
+Rust macros are a **powerful metaprogramming feature** that allow you to **generate code at compile time**, reducing repetition and boilerplate.
+
+They are expanded using the `cargo expand` command during development to see what actual code gets generated.
+
 basically to expand single line into multiple lines
 powerful feature that allows for metaprogramming by enabling the generation of code at compile-time
 
-### Key Concepts of Rust Macros:
+---
 
-1. **Code Generation**: Macros allow you to define a pattern for generating code. This means you can write code that produces other code, reducing redundancy and boilerplate.
-2. **Metaprogramming**: Rust macros are a form of metaprogramming because they allow you to write code that writes or manipulates other code. This can be useful for tasks like reducing boilerplate, creating domain-specific languages (DSLs), or automating repetitive patterns.
+## Key Concepts of Rust Macros
 
-2 types: Declarative, Procedural
+1. **Code Generation**  
+   Macros let you write patterns that generate code. This saves time and helps you avoid writing repetitive code.
 
-expand the code via -> `cargo expand`
-## Declarative Macro:
-replace the code written with a different code during compile time
-```rs
+2. **Metaprogramming**  
+   Rust macros are code that writes or manipulates other code before it's compiled. You can create small DSLs, auto-implement traits, or perform compile-time checks.
+
+---
+
+
+## Types of Macros
+
+### 1. **Declarative Macros** (a.k.a. `macro_rules!`)
+- These are pattern-based and match tokens to expand into Rust code during the
+compile time.
+- Useful for simple or repeatable patterns.
+
+```rust
+// This macro expands a single line into multiple lines during compile time
 macro_rules! say_hello {
     () => {
         println!("Hello, world!");
@@ -6483,12 +6886,23 @@ macro_rules! say_hello {
 fn main() {
     say_hello!();  // Expands to: println!("Hello, world!");
 }
+````
+
+You can view the expanded code with:
+
+```bash
+cargo expand
 ```
 
-## Procedural Macro:
-more complex macros that allow you to define custom behavior for code generation through Rust code itself
+---
+
+### 2. **Procedural Macros**
+
+Procedural macros are **more complex and flexible**. They operate on the actual token stream of the code.
+
+To use procedural macros, they must be defined in a separate crate of type `proc-macro`.
+
 ```rs
-
 #[derive(Serialize, Deserialize)]
 struct User {
 	username: String,
@@ -6497,24 +6911,59 @@ struct User {
 }
 ```
 
-### Types of procedural macros
 
-1. **Custom derive macros**
+#### Types of Procedural Macros:
 
-Custom derive macros allow you to define how Rust derives certain traits for types. A common use case is generating code for trait implementations (like `Debug`, `Clone`, etc.).
+---
+
+### A. **Custom Derive Macros**
+
+* Used to auto-generate trait implementations.
+* Commonly used with libraries like `serde` for serialization.
 
 ```rust
+// First, add dependencies:
+// cargo add serde serde_json
+// or update Cargo.toml:
+// serde = { version = "1.0.218", features = ["derive"] }
+
+use serde::{Serialize, Deserialize};
+
+// This struct derives Serialize and Deserialize using procedural macros
 #[derive(Serialize, Deserialize)]
 struct User {
-	username: String,
-	password: String,
-	age: u32
+    #[serde(rename = "user_name")]   // Customize field names in serialized output
+    username: String,
+    
+    #[serde(rename = "pass_word")]
+    password: String,
+    
+    #[serde(rename = "user_age")]
+    age: u32,
+}
+
+fn main() {
+    let user = User {
+        username: String::from("Alice"),
+        password: String::from("password123"),
+        age: 30,
+    };
+
+    // Serializing to JSON using the generated Serialize implementation
+    let json = serde_json::to_string(&user).unwrap();
+    println!("{}", json); 
+    // Output: {"user_name":"Alice","pass_word":"password123","user_age":30}
 }
 ```
 
-1. **Attribute-like Macros**:
+---
+
+### B. **Attribute-like Macros**
+
+* Define custom attributes for items like functions or modules.
 
 ```rust
+// These macros might be defined in a web framework
 #[route("GET")]
 fn home() {
     println!("Welcome to the home page!");
@@ -6526,9 +6975,21 @@ fn create_post() {
 }
 ```
 
-1. **Function like macros**
+---
 
-https://github.com/100xdevs-cohort-3/proc-macro/
+### C. **Function-like Macros**
+
+* They look like functions but operate on token streams.
+* Powerful for DSLs or custom syntax processing.
+
+```rust
+// Typically used in libraries or crates like `quote`, `syn`, or frameworks.
+my_macro!(some, tokens, here);
+```
+
+Reference: [100xdevs proc-macro repo](https://github.com/100xdevs-cohort-3/proc-macro/)
+
+
 
 ### Macros applied to attributes
 
@@ -6567,6 +7028,19 @@ fn main() {
 }
 
 ```
+---
+
+## Summary
+
+| Macro Type     | Syntax           | Use Case                         | Example                |
+| -------------- | ---------------- | -------------------------------- | ---------------------- |
+| Declarative    | `macro_rules!`   | Pattern-matching, boilerplate    | `say_hello!()`         |
+| Custom Derive  | `#[derive(...)]` | Trait impl generation            | `#[derive(Serialize)]` |
+| Attribute-like | `#[attr]`        | Annotate items with custom logic | `#[route("GET")]`      |
+| Function-like  | `foo!(...)`      | Flexible token manipulation      | `my_macro!(a, b, c)`   |
+
+Use `cargo expand` to inspect macro-generated code and understand how Rust compiles your abstractions.
+
 
 Write a macro that can take more than one function name as input and create
 functions for it.-> macro3.rs
