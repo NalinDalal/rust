@@ -2306,6 +2306,98 @@ run a particular test only-> `cargo test --test test_name`
 like `integration_test.rs` and then submodule `test/common/lib.rs`
 hence it can be used anywhere as a module
 
+---
+
+# Chap 12
+# File Handling
+File handling in Rust is done using the `std::fs` and `std::io` modules. Here's a quick guide to the most common file operations:
+
+-
+
+### 🔹 1. **Reading from a File**
+
+```rust
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
+
+fn main() -> io::Result<()> {
+    let file = File::open("test.txt")?;
+    let reader = BufReader::new(file);
+
+    for line in reader.lines() {
+        let line = line?; // Handle possible IO errors
+        println!("{}", line);
+    }
+
+    Ok(())
+}
+```
+
+---
+
+### 🔹 2. **Writing to a File**
+
+```rust
+use std::fs::File;
+use std::io::{self, Write};
+
+fn main() -> io::Result<()> {
+    let mut file = File::create("output.txt")?;
+    writeln!(file, "Hello, Rust!")?;
+    Ok(())
+}
+```
+
+---
+
+### 🔹 3. **Appending to a File**
+
+```rust
+use std::fs::OpenOptions;
+use std::io::{self, Write};
+
+fn main() -> io::Result<()> {
+    let mut file = OpenOptions::new()
+        .append(true)
+        .open("output.txt")?;
+    
+    writeln!(file, "Appending another line.")?;
+    Ok(())
+}
+```
+
+---
+
+### 🔹 4. **Reading Entire File into a String**
+
+```rust
+use std::fs;
+
+fn main() -> std::io::Result<()> {
+    let content = fs::read_to_string("test.txt")?;
+    println!("{}", content);
+    Ok(())
+}
+```
+
+---
+
+### 🔹 5. **Checking if a File Exists**
+
+```rust
+use std::path::Path;
+
+fn main() {
+    if Path::new("test.txt").exists() {
+        println!("File exists!");
+    } else {
+        println!("File does not exist.");
+    }
+}
+```
+
+---
+
 # Chap 13
 # Iterators and Closures
 rust also supports functional program
