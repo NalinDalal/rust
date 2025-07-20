@@ -1,6 +1,7 @@
-mod Closure;
 mod borrowing;
 mod channel;
+mod closure;
+mod closure_cap;
 mod enum1;
 mod enum2;
 mod error;
@@ -20,6 +21,7 @@ mod macro1;
 mod macro2;
 mod macro3;
 mod macro4;
+mod macro5;
 mod memory;
 mod method;
 mod mpsc;

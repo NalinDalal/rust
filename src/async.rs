@@ -9,7 +9,7 @@ async fn main() {
     let start = Instant::now();
     async {
         for _ in 1..1000 {
-            trpl::sleep(one_ns).await; //pass a one-nanosecond Duration to trpl::sleep
+            sleep(one_ns).await; //pass a one-nanosecond Duration to sleep
         }
     }
     .await;
@@ -22,7 +22,7 @@ async fn main() {
     let start = Instant::now();
     async {
         for _ in 1..1000 {
-            trpl::yield_now().await; //yield_now is way faster
+            yield_now().await; //yield_now is way faster
         }
     }
     .await;
